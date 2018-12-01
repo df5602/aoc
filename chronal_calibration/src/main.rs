@@ -22,19 +22,21 @@ fn first_frequency_reached_twice(frequencies: &[i64]) -> i64 {
 }
 
 fn main() {
-    if let Some(input_file) = env::args().nth(1) {
-        let input: Vec<i64> = FileReader::read_from_file(input_file);
+    let input_file = match env::args().nth(1) {
+        Some(input_file) => input_file,
+        None => {
+            println!("Please supply input file!");
+            std::process::exit(1);
+        }
+    };
 
-        let sum: i64 = input.iter().sum();
+    let input: Vec<i64> = FileReader::read_from_file(input_file);
 
-        println!("Resulting frequency: {}", sum);
+    let sum: i64 = input.iter().sum();
+    println!("Resulting frequency: {}", sum);
 
-        let first_freq = first_frequency_reached_twice(&input);
-
-        println!("First frequency reached twice: {}", first_freq);
-    } else {
-        println!("Please supply input file!");
-    }
+    let first_freq = first_frequency_reached_twice(&input);
+    println!("First frequency reached twice: {}", first_freq);
 }
 
 #[cfg(test)]
