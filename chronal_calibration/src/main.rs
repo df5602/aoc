@@ -1,11 +1,11 @@
 extern crate util;
 
-use util::input::Input;
-
 use std::collections::HashSet;
 use std::env;
 
-fn first_frequency_reached_twice(frequencies: &[isize]) -> isize {
+use util::input::{FileReader, FromFile};
+
+fn first_frequency_reached_twice(frequencies: &[i64]) -> i64 {
     let mut intermediates = HashSet::new();
     intermediates.insert(0);
     let mut result = 0;
@@ -23,9 +23,9 @@ fn first_frequency_reached_twice(frequencies: &[isize]) -> isize {
 
 fn main() {
     if let Some(input_file) = env::args().nth(1) {
-        let input = Vec::<isize>::read_from_file(input_file);
+        let input: Vec<i64> = FileReader::read_from_file(input_file);
 
-        let sum: isize = input.iter().sum();
+        let sum: i64 = input.iter().sum();
 
         println!("Resulting frequency: {}", sum);
 
