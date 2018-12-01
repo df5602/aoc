@@ -30,7 +30,13 @@ fn main() {
         }
     };
 
-    let input: Vec<i64> = FileReader::read_from_file(input_file);
+    let input: Vec<i64> = match FileReader::read_from_file(input_file) {
+        Ok(input) => input,
+        Err(e) => {
+            println!("Error reading input: {}", e);
+            std::process::exit(1);
+        }
+    };
 
     let sum: i64 = input.iter().sum();
     println!("Resulting frequency: {}", sum);
