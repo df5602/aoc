@@ -2,27 +2,22 @@ extern crate util;
 
 use util::input::Input;
 
+use std::collections::HashSet;
 use std::env;
 
 fn first_frequency_reached_twice(frequencies: &[isize]) -> isize {
-    let mut intermediates = vec![0];
+    let mut intermediates = HashSet::new();
+    intermediates.insert(0);
     let mut result = 0;
     let mut sum = 0;
 
     for f in frequencies.iter().cycle() {
         sum += f;
-        match intermediates.binary_search(&sum) {
-            Ok(_) => {
-                result = sum;
-                break;
-            }
-            Err(idx) => {
-                intermediates.insert(idx, sum);
-                continue;
-            }
+        if !intermediates.insert(sum) {
+            result = sum;
+            break;
         }
     }
-
     result
 }
 
