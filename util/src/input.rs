@@ -34,7 +34,6 @@ pub struct FileReader;
 impl<T> FromFile<Vec<T>> for FileReader
 where
     T: std::str::FromStr,
-    <T as std::str::FromStr>::Err: std::fmt::Debug,
 {
     type Error = Error<<T as std::str::FromStr>::Err>;
 
