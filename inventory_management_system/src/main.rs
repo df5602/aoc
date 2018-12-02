@@ -39,7 +39,7 @@ fn main() {
 fn checksum(inputs: &[String]) -> u64 {
     let counts = inputs
         .iter()
-        .map(|input| count_exact_dual_and_triple_occurences(&input))
+        .map(|input| count_exact_dual_and_triple_occurrences(&input))
         .fold((0, 0), |mut sum, counts| {
             if counts.0 > 0 {
                 sum.0 += 1;
@@ -53,7 +53,7 @@ fn checksum(inputs: &[String]) -> u64 {
     counts.0 * counts.1
 }
 
-fn count_exact_dual_and_triple_occurences(input: &str) -> (usize, usize) {
+fn count_exact_dual_and_triple_occurrences(input: &str) -> (usize, usize) {
     // Count number of occurrence of each letter
     let mut char_count = HashMap::new();
     for c in input.chars() {
@@ -109,13 +109,13 @@ mod tests {
             String::from("abcdee"),
             String::from("ababab"),
         ];
-        assert_eq!((0, 0), count_exact_dual_and_triple_occurences(&inputs[0]));
-        assert_eq!((1, 1), count_exact_dual_and_triple_occurences(&inputs[1]));
-        assert_eq!((1, 0), count_exact_dual_and_triple_occurences(&inputs[2]));
-        assert_eq!((0, 1), count_exact_dual_and_triple_occurences(&inputs[3]));
-        assert_eq!((2, 0), count_exact_dual_and_triple_occurences(&inputs[4]));
-        assert_eq!((1, 0), count_exact_dual_and_triple_occurences(&inputs[5]));
-        assert_eq!((0, 2), count_exact_dual_and_triple_occurences(&inputs[6]));
+        assert_eq!((0, 0), count_exact_dual_and_triple_occurrences(&inputs[0]));
+        assert_eq!((1, 1), count_exact_dual_and_triple_occurrences(&inputs[1]));
+        assert_eq!((1, 0), count_exact_dual_and_triple_occurrences(&inputs[2]));
+        assert_eq!((0, 1), count_exact_dual_and_triple_occurrences(&inputs[3]));
+        assert_eq!((2, 0), count_exact_dual_and_triple_occurrences(&inputs[4]));
+        assert_eq!((1, 0), count_exact_dual_and_triple_occurrences(&inputs[5]));
+        assert_eq!((0, 2), count_exact_dual_and_triple_occurrences(&inputs[6]));
     }
 
     #[test]
