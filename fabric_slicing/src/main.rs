@@ -33,11 +33,7 @@ fn main() {
 
     // Fill grid
     for rect in input.iter() {
-        for x in rect.pos_x..(rect.pos_x + rect.width) {
-            for y in rect.pos_y..(rect.pos_y + rect.height) {
-                grid.increment_at(x, y);
-            }
-        }
+        grid.add_rectangle(&rect);
     }
 
     println!(
@@ -47,17 +43,13 @@ fn main() {
 
     let mut non_overlapping_claim = None;
     for a in input.iter() {
-        let mut collision_detected = false;
-        for b in input.iter() {
-            if a.owner == b.owner {
-                continue;
-            }
-            if a.collides_with(&b) {
-                collision_detected = true;
-            }
-        }
-        if !collision_detected {
+        if input
+            .iter()
+            .filter(|&b| a.owner != b.owner)
+            .all(|b| !a.collides_with(b))
+        {
             non_overlapping_claim = Some(a.owner);
+            break;
         }
     }
 
@@ -143,6 +135,14 @@ impl Grid {
             width,
             height,
             grid: vec![0; width * height],
+        }
+    }
+
+    fn add_rectangle(&mut self, r: &Rectangle) {
+        for x in r.pos_x..(r.pos_x + r.width) {
+            for y in r.pos_y..(r.pos_y + r.height) {
+                self.increment_at(x, y);
+            }
         }
     }
 
