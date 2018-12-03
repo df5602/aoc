@@ -5,6 +5,7 @@ use std::env;
 use std::str::FromStr;
 
 use util::input::{FileReader, FromFile};
+use util::rectangle::Rectangle;
 
 fn main() {
     let input_file = match env::args().nth(1) {
@@ -15,8 +16,7 @@ fn main() {
         }
     };
 
-    // Parse input
-    let input: Vec<Rectangle> = match FileReader::read_from_file(input_file) {
+    let input: Vec<Claim> = match FileReader::read_from_file(input_file) {
         Ok(input) => input,
         Err(e) => {
             println!("Error reading input: {}", e);
@@ -24,16 +24,15 @@ fn main() {
         }
     };
 
-    // Create grid
     let (max_width, max_height) = input
         .iter()
-        .map(|rect| (rect.pos_x + rect.width, rect.pos_y + rect.height))
+        .map(|claim| &claim.rectangle)
+        .map(|rect| (rect.x() + rect.width(), rect.y() + rect.height()))
         .fold((0, 0), |m, dims| (max(m.0, dims.0), max(m.1, dims.1)));
     let mut grid = Grid::new(max_width, max_height);
 
-    // Fill grid
-    for rect in input.iter() {
-        grid.add_rectangle(&rect);
+    for claim in input.iter() {
+        grid.add_rectangle(&claim.rectangle);
     }
 
     println!(
@@ -46,7 +45,7 @@ fn main() {
         if input
             .iter()
             .filter(|&b| a.owner != b.owner)
-            .all(|b| !a.collides_with(b))
+            .all(|b| !a.rectangle.collides_with(&b.rectangle))
         {
             non_overlapping_claim = Some(a.owner);
             break;
@@ -60,46 +59,34 @@ fn main() {
 }
 
 #[derive(Debug)]
-struct Rectangle {
+struct Claim {
     owner: usize,
-    pos_x: usize,
-    pos_y: usize,
-    width: usize,
-    height: usize,
-}
-
-impl Rectangle {
-    fn collides_with(&self, other: &Rectangle) -> bool {
-        other.pos_x < self.pos_x + self.width
-            && other.pos_x + other.width > self.pos_x
-            && other.pos_y < self.pos_y + self.height
-            && other.pos_y + other.height > self.pos_y
-    }
+    rectangle: Rectangle,
 }
 
 #[derive(Debug)]
-enum RectangleParseError {
+enum ClaimParseError {
     ParseIntError(std::num::ParseIntError),
     ParseError(String),
 }
 
-impl std::fmt::Display for RectangleParseError {
+impl std::fmt::Display for ClaimParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            RectangleParseError::ParseIntError(e) => write!(f, "Error parsing int: {}", e),
-            RectangleParseError::ParseError(s) => write!(f, "Error parsing rectangle: {}", s),
+            ClaimParseError::ParseIntError(e) => write!(f, "Error parsing int: {}", e),
+            ClaimParseError::ParseError(s) => write!(f, "Error parsing claim: {}", s),
         }
     }
 }
 
-impl From<std::num::ParseIntError> for RectangleParseError {
+impl From<std::num::ParseIntError> for ClaimParseError {
     fn from(error: std::num::ParseIntError) -> Self {
-        RectangleParseError::ParseIntError(error)
+        ClaimParseError::ParseIntError(error)
     }
 }
 
-impl FromStr for Rectangle {
-    type Err = RectangleParseError;
+impl FromStr for Claim {
+    type Err = ClaimParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let substrings: Vec<_> = s
@@ -108,16 +95,18 @@ impl FromStr for Rectangle {
             .map(|s| s.trim())
             .collect();
         if substrings.len() != 5 {
-            return Err(RectangleParseError::ParseError(String::from(
+            return Err(ClaimParseError::ParseError(String::from(
                 "input does not match format",
             )));
         }
         Ok(Self {
             owner: substrings[0].parse()?,
-            pos_x: substrings[1].parse()?,
-            pos_y: substrings[2].parse()?,
-            width: substrings[3].parse()?,
-            height: substrings[4].parse()?,
+            rectangle: Rectangle::new(
+                substrings[1].parse()?,
+                substrings[2].parse()?,
+                substrings[3].parse()?,
+                substrings[4].parse()?,
+            ),
         })
     }
 }
@@ -139,8 +128,8 @@ impl Grid {
     }
 
     fn add_rectangle(&mut self, r: &Rectangle) {
-        for x in r.pos_x..(r.pos_x + r.width) {
-            for y in r.pos_y..(r.pos_y + r.height) {
+        for x in r.x()..(r.x() + r.width()) {
+            for y in r.y()..(r.y() + r.height()) {
                 self.increment_at(x, y);
             }
         }
@@ -156,62 +145,5 @@ impl Grid {
 
     fn count_eq_or_above(&self, val: u32) -> usize {
         self.grid.iter().filter(|&v| *v >= val).count()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_collisions() {
-        let rect1 = Rectangle {
-            owner: 0,
-            pos_x: 3,
-            pos_y: 2,
-            width: 7,
-            height: 5,
-        };
-        let mut rect2 = Rectangle {
-            owner: 0,
-            pos_x: 7,
-            pos_y: 3,
-            width: 7,
-            height: 7,
-        };
-
-        assert!(rect1.collides_with(&rect2));
-
-        rect2.pos_x = 9;
-        assert!(rect1.collides_with(&rect2));
-
-        rect2.pos_x = 10;
-        assert!(!rect1.collides_with(&rect2));
-
-        rect2.pos_x = 3;
-        assert!(rect1.collides_with(&rect2));
-
-        rect2.pos_x = 2;
-        assert!(rect1.collides_with(&rect2));
-
-        rect2.pos_x = 1;
-        rect2.width = 2;
-        assert!(!rect1.collides_with(&rect2));
-
-        rect2.pos_x = 7;
-        rect2.width = 7;
-
-        rect2.pos_y = 6;
-        assert!(rect1.collides_with(&rect2));
-
-        rect2.pos_y = 7;
-        assert!(!rect1.collides_with(&rect2));
-
-        rect2.pos_y = 1;
-        rect2.height = 2;
-        assert!(rect1.collides_with(&rect2));
-
-        rect2.height = 1;
-        assert!(!rect1.collides_with(&rect2));
     }
 }
