@@ -4,4 +4,5 @@ members = [
     "util",
     "chronal_calibration",
     "inventory_management_system",
+    "fabric_slicing",
 ]

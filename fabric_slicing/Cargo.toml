@@ -1,0 +1,7 @@
+[package]
+name = "fabric_slicing"
+version = "0.1.0"
+authors = ["df5602 <dominik@fankhausers.ch>"]
+
+[dependencies]
+util = { path = "../util" }
