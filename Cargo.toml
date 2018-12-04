@@ -5,4 +5,5 @@ members = [
     "chronal_calibration",
     "inventory_management_system",
     "fabric_slicing",
+    "repose_record",
 ]

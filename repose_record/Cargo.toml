@@ -1,0 +1,8 @@
+[package]
+name = "repose_record"
+version = "0.1.0"
+authors = ["df5602 <dominik@fankhausers.ch>"]
+
+[dependencies]
+util = { path = "../util" }
+chrono = "0.4"
