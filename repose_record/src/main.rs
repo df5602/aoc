@@ -30,7 +30,13 @@ fn main() {
     input.sort_unstable_by_key(|r| r.timestamp);
     let input = input;
 
-    let (guard_most_asleep, asleep_time, minute_asleep_most) = part1(&input);
+    let (
+        guard_most_asleep,
+        asleep_time,
+        minute_asleep_most,
+        guard_most_asleep_2,
+        minute_asleep_most_2,
+    ) = part1_2(&input);
 
     println!(
         "Guard most asleep: {} => was asleep for {} minutes (most at minute {}) => Result: {}",
@@ -39,9 +45,16 @@ fn main() {
         minute_asleep_most,
         guard_most_asleep * minute_asleep_most
     );
+
+    println!(
+        "Guard most asleep at single minute: {} @ minute {} => Result: {}",
+        guard_most_asleep_2,
+        minute_asleep_most_2,
+        guard_most_asleep_2 * minute_asleep_most_2
+    );
 }
 
-fn part1(input: &[Record]) -> (usize, usize, usize) {
+fn part1_2(input: &[Record]) -> (usize, usize, usize, usize, usize) {
     let mut map_minutes: HashMap<usize, [usize; 60]> = HashMap::new();
     let mut map_totals: HashMap<usize, usize> = HashMap::new();
 
@@ -77,18 +90,40 @@ fn part1(input: &[Record]) -> (usize, usize, usize) {
             asleep_time = *total;
         }
     }
-    let minutes = map_minutes.entry(guard_most_asleep).or_insert([0; 60]);
 
     let mut minute_asleep_most = 0;
-    let mut max_minute = 0;
-    for (min, tot) in minutes.iter().enumerate() {
-        if *tot > max_minute {
-            max_minute = *tot;
-            minute_asleep_most = min;
+    {
+        let minutes = map_minutes.entry(guard_most_asleep).or_insert([0; 60]);
+
+        let mut max_minute = 0;
+        for (min, tot) in minutes.iter().enumerate() {
+            if *tot > max_minute {
+                max_minute = *tot;
+                minute_asleep_most = min;
+            }
         }
     }
 
-    (guard_most_asleep, asleep_time, minute_asleep_most)
+    let mut guard_most_asleep_2 = 0;
+    let mut minute_asleep_most_2 = 0;
+    let mut max_minute = 0;
+    for (id, minutes) in map_minutes.iter() {
+        for (min, tot) in minutes.iter().enumerate() {
+            if *tot > max_minute {
+                max_minute = *tot;
+                minute_asleep_most_2 = min;
+                guard_most_asleep_2 = *id;
+            }
+        }
+    }
+
+    (
+        guard_most_asleep,
+        asleep_time,
+        minute_asleep_most,
+        guard_most_asleep_2,
+        minute_asleep_most_2,
+    )
 }
 
 #[derive(Debug)]
@@ -205,6 +240,6 @@ mod tests {
             input.push(line.parse().unwrap());
         }
 
-        assert_eq!((10, 50, 24), part1(&input));
+        assert_eq!((10, 50, 24, 99, 45), part1_2(&input));
     }
 }
