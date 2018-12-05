@@ -6,4 +6,5 @@ members = [
     "inventory_management_system",
     "fabric_slicing",
     "repose_record",
+    "alchemical_reduction",
 ]
