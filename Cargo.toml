@@ -7,4 +7,5 @@ members = [
     "fabric_slicing",
     "repose_record",
     "alchemical_reduction",
+    "chronal_coordinates",
 ]
