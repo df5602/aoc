@@ -30,6 +30,9 @@ fn main() {
         "Largest area: {} (Point: ({},{}))",
         largest_area, point_with_largest_area.0, point_with_largest_area.1
     );
+
+    let size_of_region = find_region(&input, 10000);
+    println!("Size  of region: {}", size_of_region);
 }
 
 fn find_largest_area(points: &[Point]) -> (usize, (usize, usize)) {
@@ -74,6 +77,29 @@ fn find_largest_area(points: &[Point]) -> (usize, (usize, usize)) {
     }
 
     (largest_area, point_with_largest_area)
+}
+
+fn find_region(points: &[Point], distance_threshold: usize) -> usize {
+    let (max_width, max_height) = points
+        .iter()
+        .fold((0, 0), |m, p| (max(m.0, p.x), max(m.1, p.y)));
+
+    let mut size_of_region = 0;
+    for x in 0..=max_width {
+        for y in 0..=max_height {
+            let p = Point::new(x, y);
+            let mut sum_of_distances = 0;
+            for dist in points.iter().map(|q| p.manhattan_distance_to(&q)) {
+                sum_of_distances += dist;
+            }
+
+            if sum_of_distances < distance_threshold {
+                size_of_region += 1;
+            }
+        }
+    }
+
+    size_of_region
 }
 
 #[derive(Debug, Clone)]
@@ -138,5 +164,18 @@ mod tests {
         let (largest_area, point_with_largest_area) = find_largest_area(&points);
         assert_eq!(17, largest_area);
         assert_eq!((5, 5), point_with_largest_area);
+    }
+
+    #[test]
+    fn test_find_region() {
+        let points = vec![
+            Point::new(1, 1),
+            Point::new(1, 6),
+            Point::new(8, 3),
+            Point::new(3, 4),
+            Point::new(5, 5),
+            Point::new(8, 9),
+        ];
+        assert_eq!(16, find_region(&points, 32));
     }
 }
