@@ -75,6 +75,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "sum_of_its_parts"
+version = "0.1.0"
+dependencies = [
+ "util 0.1.0",
+]
+
+[[package]]
 name = "time"
 version = "0.1.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
