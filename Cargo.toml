@@ -9,4 +9,5 @@ members = [
     "alchemical_reduction",
     "chronal_coordinates",
     "sum_of_its_parts",
+    "memory_maneuver",
 ]
