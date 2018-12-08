@@ -14,7 +14,7 @@ fn main() {
         }
     };
 
-    let input: Vec<String> = match FileReader::read_from_file(input_file) {
+    let input: String = match FileReader::read_from_file(input_file) {
         Ok(input) => input,
         Err(e) => {
             println!("Error reading input: {}", e);
@@ -22,24 +22,19 @@ fn main() {
         }
     };
 
-    if input.len() != 1 {
-        println!("Expected exactly one String as input!");
-        std::process::exit(1);
-    }
-
     // Check ASCII
-    if !input[0].is_ascii() {
+    if !input.is_ascii() {
         println!("Input is not ASCII!");
         std::process::exit(1);
     }
 
-    println!("Remaining units: {}", react(&input[0], None));
+    println!("Remaining units: {}", react(&input, None));
 
     let mut shortest_polymer = usize::max_value();
     let mut problematic_unit = 0;
 
     for c in b'a'..=b'z' {
-        let length = react(&input[0], Some(c));
+        let length = react(&input, Some(c));
         if length < shortest_polymer {
             shortest_polymer = length;
             problematic_unit = c;

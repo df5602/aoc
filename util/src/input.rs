@@ -1,6 +1,6 @@
 //! Helper module that allows to read input from a file and into a user-specified destination.
 //!
-//! The input is expected to consist of a list of values of the same type separated by newlines.
+//! For most implementations, the input is expected to consist of a list of values of the same type separated by newlines.
 //!
 //! # Examples
 //! ```no_run
@@ -11,7 +11,7 @@
 //! ```
 
 use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read};
 use std::path::Path;
 
 /// Generic trait to read from file and into a destination of type `T`.
@@ -71,5 +71,22 @@ where
             .lines()
             .map(|line| line?.trim().parse().map_err(Error::ParseError))
             .collect()
+    }
+}
+
+/// Read input into a `String`.
+impl FromFile<String> for FileReader {
+    type Error = std::io::Error;
+
+    /// Takes a file path and tries to read the file content into a `String`.
+    ///
+    /// # Failures
+    /// Returns an error if the specified file cannot be opened or contains invalid UTF-8.
+    fn read_from_file<P: AsRef<Path>>(path: P) -> Result<String, Self::Error> {
+        let mut file = File::open(path)?;
+        let mut buffer = String::new();
+
+        file.read_to_string(&mut buffer)?;
+        Ok(buffer)
     }
 }
