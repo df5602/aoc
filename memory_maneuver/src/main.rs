@@ -13,7 +13,7 @@ fn main() {
         }
     };
 
-    let input: Vec<String> = match FileReader::read_from_file(input_file) {
+    let input: String = match FileReader::read_from_file(input_file) {
         Ok(input) => input,
         Err(e) => {
             println!("Error reading input: {}", e);
@@ -21,13 +21,8 @@ fn main() {
         }
     };
 
-    if input.len() != 1 {
-        println!("Expected exactly one String as input!");
-        std::process::exit(1);
-    }
-
     // Collect to Vec<usize>
-    let input: Vec<usize> = if let Ok(v) = input[0]
+    let input: Vec<usize> = if let Ok(v) = input
         .split_whitespace()
         .map(|s| s.trim())
         .filter(|s| !s.is_empty())
