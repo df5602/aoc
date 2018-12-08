@@ -40,17 +40,18 @@ fn main() {
         std::process::exit(1);
     };
 
-    let sum_of_metadata = match sum_metadata(&input) {
-        Ok((sum, _)) => sum,
+    let (sum_of_metadata, root_value) = match sum_metadata(&input) {
+        Ok((sum, root_value, _)) => (sum, root_value),
         Err(e) => {
             println!("Error summing metadata: {}", e);
             std::process::exit(1);
         }
     };
     println!("Sum of metadata: {}", sum_of_metadata);
+    println!("Value of root node: {}", root_value);
 }
 
-fn sum_metadata(input: &[usize]) -> Result<(usize, &[usize]), String> {
+fn sum_metadata(input: &[usize]) -> Result<(usize, usize, &[usize]), String> {
     if input.len() < 2 {
         return Err(String::from("Expected header, got end of data"));
     }
@@ -61,15 +62,32 @@ fn sum_metadata(input: &[usize]) -> Result<(usize, &[usize]), String> {
     let mut input = &input[2..];
     let mut sum = 0;
 
+    let mut values: Vec<usize> = Vec::new();
     for _ in 0..number_child_nodes {
         let res = sum_metadata(&input)?;
         sum += res.0;
-        input = res.1;
+        values.push(res.1);
+        input = res.2;
     }
 
-    sum += input[..number_metadata_entries].iter().sum::<usize>();
+    let sum_of_metadata = input[..number_metadata_entries].iter().sum::<usize>();
+    sum += sum_of_metadata;
 
-    Ok((sum, &input[number_metadata_entries..]))
+    let node_value = if values.is_empty() {
+        sum_of_metadata
+    } else {
+        input[..number_metadata_entries]
+            .iter()
+            .fold(0, |mut sum, &metadata| {
+                if metadata != 0 && metadata <= values.len() {
+                    sum += values[metadata - 1];
+                }
+
+                sum
+            })
+    };
+
+    Ok((sum, node_value, &input[number_metadata_entries..]))
 }
 
 #[cfg(test)]
@@ -79,7 +97,14 @@ mod tests {
     #[test]
     fn test_sum_metadata() {
         let input = vec![2, 3, 0, 3, 10, 11, 12, 1, 1, 0, 1, 99, 2, 1, 1, 2];
-        let (sum, _) = sum_metadata(&input).unwrap();
+        let (sum, _, _) = sum_metadata(&input).unwrap();
         assert_eq!(138, sum);
+    }
+
+    #[test]
+    fn test_node_value() {
+        let input = vec![2, 3, 0, 3, 10, 11, 12, 1, 1, 0, 1, 99, 2, 1, 1, 2];
+        let (_, root_value, _) = sum_metadata(&input).unwrap();
+        assert_eq!(66, root_value);
     }
 }
