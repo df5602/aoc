@@ -10,4 +10,5 @@ members = [
     "chronal_coordinates",
     "sum_of_its_parts",
     "memory_maneuver",
+    "marble_mania",
 ]
