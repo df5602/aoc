@@ -1,6 +1,6 @@
 extern crate util;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::env;
 
 use util::input::{FileReader, FromFile};
@@ -43,28 +43,27 @@ fn play_game(players: usize, last_marble: usize) -> usize {
         return 0;
     }
 
-    let mut circle: Vec<usize> = vec![0, 2, 1];
+    let mut circle: CircularTape<usize> = CircularTape::new();
+    circle.push(0);
+    circle.push(2);
+    circle.push(1);
+    circle.rotate(1); // move 2 into current position
+
     let mut scores: HashMap<usize, usize> = HashMap::new();
     let mut current_player = 3;
-    let mut current_marble = 1;
 
     // Game is currently in the state:
     // [2]  0 (2) 1
 
     for marble in 3..=last_marble {
-        if marble % 16384 == 0 {
-            println!("Current marble: {}", marble);
-        }
         if marble % 23 == 0 {
-            let mut score = marble;
-            let remove_position = (current_marble + circle.len() - 7) % circle.len();
-            score += circle.remove(remove_position);
-            current_marble = remove_position;
+            circle.rotate(-7);
+            let score = marble + circle.remove().unwrap();
+
             *(scores.entry(current_player).or_insert(0)) += score;
         } else {
-            let next_position = (current_marble + 2) % circle.len();
-            circle.insert(next_position, marble);
-            current_marble = next_position;
+            circle.rotate(2);
+            circle.insert(marble);
         }
         current_player = (current_player % players) + 1;
     }
@@ -72,6 +71,54 @@ fn play_game(players: usize, last_marble: usize) -> usize {
     match scores.values().max() {
         Some(score) => *score,
         None => 0,
+    }
+}
+
+struct CircularTape<T> {
+    deque: VecDeque<T>,
+}
+
+impl<T> CircularTape<T> {
+    fn new() -> Self {
+        Self {
+            deque: VecDeque::new(),
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.deque.len()
+    }
+
+    fn push(&mut self, value: T) {
+        self.deque.push_back(value);
+    }
+
+    fn insert(&mut self, value: T) {
+        self.deque.push_front(value);
+    }
+
+    fn remove(&mut self) -> Option<T> {
+        self.deque.pop_front()
+    }
+
+    fn rotate(&mut self, mut amount: isize) {
+        if self.len() < 2 {
+            return;
+        }
+
+        // Amount > 0 <=> rotate counter-clockwise (or left-to-right)
+        while amount > 0 {
+            let front = self.deque.pop_front().unwrap();
+            self.deque.push_back(front);
+            amount -= 1;
+        }
+
+        // Amount < 0 <=> rotate clock-wise (or right-to-left)
+        while amount < 0 {
+            let back = self.deque.pop_back().unwrap();
+            self.deque.push_front(back);
+            amount += 1;
+        }
     }
 }
 
