@@ -6,3 +6,4 @@ edition = "2018"
 
 [dependencies]
 util = { path = "../util" }
+regex = "1"

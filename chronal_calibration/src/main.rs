@@ -30,7 +30,7 @@ fn main() {
         }
     };
 
-    let input: Vec<i64> = match FileReader::read_from_file(input_file) {
+    let input: Vec<i64> = match FileReader::new().read_from_file(input_file) {
         Ok(input) => input,
         Err(e) => {
             println!("Error reading input: {}", e);

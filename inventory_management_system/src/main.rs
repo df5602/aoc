@@ -14,7 +14,7 @@ fn main() {
         }
     };
 
-    let input: Vec<String> = match FileReader::read_from_file(input_file) {
+    let input: Vec<String> = match FileReader::new().read_from_file(input_file) {
         Ok(input) => input,
         Err(e) => {
             println!("Error reading input: {}", e);

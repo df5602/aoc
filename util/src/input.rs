@@ -14,13 +14,15 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::path::Path;
 
+use regex::Regex;
+
 /// Generic trait to read from file and into a destination of type `T`.
 pub trait FromFile<T> {
     /// The error type
     type Error;
 
     /// Takes a file path and tries to read the file content into a destination of type `T`.
-    fn read_from_file<P: AsRef<Path>>(path: P) -> Result<T, Self::Error>;
+    fn read_from_file<P: AsRef<Path>>(&self, path: P) -> Result<T, Self::Error>;
 }
 
 #[derive(Debug)]
@@ -30,6 +32,8 @@ pub enum Error<E> {
     IoError(std::io::Error),
     /// Returned if the input cannot be parsed into the specified data type.
     ParseError(E),
+    /// Returned if the input doesn't correspond to the expected format.
+    FormatError(String),
 }
 
 impl<E: std::fmt::Display> std::fmt::Display for Error<E> {
@@ -37,6 +41,7 @@ impl<E: std::fmt::Display> std::fmt::Display for Error<E> {
         match self {
             Error::IoError(e) => write!(f, "{}", e),
             Error::ParseError(e) => write!(f, "{}", e),
+            Error::FormatError(s) => write!(f, "{}", s),
         }
     }
 }
@@ -48,7 +53,35 @@ impl<E> From<std::io::Error> for Error<E> {
 }
 
 /// Read input from file.
-pub struct FileReader;
+pub struct FileReader {
+    item_separator: char, // TODO: make more generic over type of pattern
+    parse_regex: Option<Regex>,
+}
+
+#[allow(clippy::new_without_default_derive)]
+impl FileReader {
+    // TODO: investigate builder pattern...
+    pub fn new() -> Self {
+        Self {
+            item_separator: ',',
+            parse_regex: None,
+        }
+    }
+
+    pub fn separator(self, separator: char) -> Self {
+        Self {
+            item_separator: separator,
+            ..self
+        }
+    }
+
+    pub fn parse(self, regex: Regex) -> Self {
+        Self {
+            parse_regex: Some(regex),
+            ..self
+        }
+    }
+}
 
 /// Read input into a `Vec<T>`. Input is assumed to be a list of values that can be parsed into `T`
 /// that are separated by newlines.
@@ -63,7 +96,7 @@ where
     /// # Failures
     /// Returns an error if the specified file cannot be opened or contains invalid UTF-8.
     /// Also returns an error if the file contents cannot be parsed into values of type `T`.
-    fn read_from_file<P: AsRef<Path>>(path: P) -> Result<Vec<T>, Self::Error> {
+    fn read_from_file<P: AsRef<Path>>(&self, path: P) -> Result<Vec<T>, Self::Error> {
         let file = File::open(path)?;
         let reader = BufReader::new(file);
 
@@ -82,11 +115,85 @@ impl FromFile<String> for FileReader {
     ///
     /// # Failures
     /// Returns an error if the specified file cannot be opened or contains invalid UTF-8.
-    fn read_from_file<P: AsRef<Path>>(path: P) -> Result<String, Self::Error> {
+    fn read_from_file<P: AsRef<Path>>(&self, path: P) -> Result<String, Self::Error> {
         let mut file = File::open(path)?;
         let mut buffer = String::new();
 
         file.read_to_string(&mut buffer)?;
         Ok(buffer)
+    }
+}
+
+/// Read input into tuple of type `(T, T)`. By default it is assumed that the items are separated by comma.
+impl<T> FromFile<(T, T)> for FileReader
+where
+    T: std::str::FromStr,
+{
+    type Error = Error<<T as std::str::FromStr>::Err>;
+
+    fn read_from_file<P: AsRef<Path>>(&self, path: P) -> Result<(T, T), Self::Error> {
+        let mut file = File::open(path)?;
+        let mut buffer = String::new();
+
+        file.read_to_string(&mut buffer)?;
+
+        match self.parse_regex {
+            Some(ref regex) => {
+                let mut captures = match regex.captures(&buffer) {
+                    Some(captures) => captures,
+                    None => {
+                        return Err(Error::FormatError(
+                            "input does not match expected format (0)".to_string(),
+                        ));
+                    }
+                };
+
+                let first = match captures.get(1) {
+                    Some(capture) => capture.as_str().parse::<T>().map_err(Error::ParseError)?,
+                    None => {
+                        return Err(Error::FormatError(
+                            "input does not match expected format (1)".to_string(),
+                        ));
+                    }
+                };
+                let second = match captures.get(2) {
+                    Some(capture) => capture.as_str().parse::<T>().map_err(Error::ParseError)?,
+                    None => {
+                        return Err(Error::FormatError(
+                            "input does not match expected format (2)".to_string(),
+                        ));
+                    }
+                };
+
+                if captures.get(3).is_some() {
+                    return Err(Error::FormatError(
+                        "input does not match expected format (3)".to_string(),
+                    ));
+                }
+
+                Ok((first, second))
+            }
+            None => {
+                let mut iter = buffer
+                    .split(self.item_separator)
+                    .map(|s| s.trim())
+                    .map(|s| s.parse::<T>().map_err(Error::ParseError));
+
+                let first = match iter.next() {
+                    Some(item) => item?,
+                    None => return Err(Error::FormatError("expected 2 items, got 0".to_string())),
+                };
+                let second = match iter.next() {
+                    Some(item) => item?,
+                    None => return Err(Error::FormatError("expected 2 items, got 1".to_string())),
+                };
+
+                if iter.next().is_some() {
+                    return Err(Error::FormatError("expected 2 items, got more".to_string()));
+                }
+
+                Ok((first, second))
+            }
+        }
     }
 }

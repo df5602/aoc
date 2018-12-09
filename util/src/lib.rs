@@ -1,3 +1,5 @@
+extern crate regex;
+
 pub mod input;
-pub mod string;
 pub mod rectangle;
+pub mod string;

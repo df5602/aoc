@@ -16,7 +16,7 @@ fn main() {
         }
     };
 
-    let input: Vec<Dependency> = match FileReader::read_from_file(input_file) {
+    let input: Vec<Dependency> = match FileReader::new().read_from_file(input_file) {
         Ok(input) => input,
         Err(e) => {
             println!("Error reading input: {}", e);

@@ -1,9 +1,12 @@
+extern crate regex;
 extern crate util;
 
 use std::collections::{HashMap, VecDeque};
 use std::env;
 
 use util::input::{FileReader, FromFile};
+
+use regex::Regex;
 
 fn main() {
     let input_file = match env::args().nth(1) {
@@ -14,17 +17,16 @@ fn main() {
         }
     };
 
-    let input: String = match FileReader::read_from_file(input_file) {
-        Ok(input) => input,
-        Err(e) => {
-            println!("Error reading input: {}", e);
-            std::process::exit(1);
+    let (number_players, last_marble) = {
+        let regex = Regex::new(r"^(\d+)\D+(\d+)\D*$").unwrap();
+        match FileReader::new().parse(regex).read_from_file(input_file) {
+            Ok(input) => input,
+            Err(e) => {
+                println!("Error reading input: {}", e);
+                std::process::exit(1);
+            }
         }
     };
-
-    let substrings: Vec<_> = input.split_whitespace().collect();
-    let number_players: usize = substrings[0].parse().unwrap();
-    let last_marble: usize = substrings[6].parse().unwrap();
 
     println!(
         "Number of players: {}; Last marble: {}",

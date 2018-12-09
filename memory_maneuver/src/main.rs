@@ -13,7 +13,7 @@ fn main() {
         }
     };
 
-    let input: String = match FileReader::read_from_file(input_file) {
+    let input: String = match FileReader::new().read_from_file(input_file) {
         Ok(input) => input,
         Err(e) => {
             println!("Error reading input: {}", e);

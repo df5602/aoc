@@ -19,7 +19,7 @@ fn main() {
         }
     };
 
-    let mut input: Vec<Record> = match FileReader::read_from_file(input_file) {
+    let mut input: Vec<Record> = match FileReader::new().read_from_file(input_file) {
         Ok(input) => input,
         Err(e) => {
             println!("Error reading input: {}", e);
