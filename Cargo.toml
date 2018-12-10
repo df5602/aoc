@@ -11,4 +11,5 @@ members = [
     "sum_of_its_parts",
     "memory_maneuver",
     "marble_mania",
+    "stars_align",
 ]
