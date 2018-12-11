@@ -1,7 +1,7 @@
 extern crate util;
 
 use std::env;
-use std::io::{self, BufRead};
+use std::io::BufRead;
 use std::str::FromStr;
 
 use util::input::{FileReader, FromFile};
@@ -84,7 +84,7 @@ fn display_points(points: &[Point], dimensions: Dimensions) {
     for (i, &b) in buffer.iter().enumerate() {
         print!("{}", b as char);
         if (i + 1) % width == 0 {
-            println!("");
+            println!();
         }
     }
 }

@@ -12,4 +12,5 @@ members = [
     "memory_maneuver",
     "marble_mania",
     "stars_align",
+    "chronal_charge",
 ]
