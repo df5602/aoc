@@ -41,19 +41,48 @@ fn main() {
         }
     }
 
+    let (mut max_coord_x, mut max_coord_y, mut max_total_power) =
+        calculate_max_total_power(&grid, width, height, 3);
+
+    println!(
+        "Total power level at ({},{}) is {}",
+        max_coord_x, max_coord_y, max_total_power
+    );
+
+    let mut max_size = 3;
+
+    for s in 1..=300 {
+        let (coord_x, coord_y, total_power) = calculate_max_total_power(&grid, width, height, s);
+        if total_power > max_total_power {
+            max_total_power = total_power;
+            max_size = s;
+            max_coord_x = coord_x;
+            max_coord_y = coord_y;
+        }
+    }
+
+    println!(
+        "Total power level at ({},{},{}) is {}",
+        max_coord_x, max_coord_y, max_size, max_total_power
+    );
+}
+
+fn calculate_max_total_power(
+    grid: &[isize],
+    width: usize,
+    height: usize,
+    size: usize,
+) -> (usize, usize, isize) {
     let mut max_total_power = isize::min_value();
     let mut max_coord = (0, 0);
-    for x in 1..=(width - 2) {
-        for y in 1..=(height - 2) {
-            let total_power = grid[to_idx(x, y, width)..to_idx(x + 3, y, width)]
-                .iter()
-                .sum::<isize>()
-                + grid[to_idx(x, y + 1, width)..to_idx(x + 3, y + 1, width)]
+    for x in 1..=(width - size + 1) {
+        for y in 1..=(height - size + 1) {
+            let mut total_power = 0;
+            for i in 0..size {
+                total_power += grid[to_idx(x, y + i, width)..to_idx(x + size, y + i, width)]
                     .iter()
                     .sum::<isize>()
-                + grid[to_idx(x, y + 2, width)..to_idx(x + 3, y + 2, width)]
-                    .iter()
-                    .sum::<isize>();
+            }
             if total_power > max_total_power {
                 max_total_power = total_power;
                 max_coord = (x, y);
@@ -61,10 +90,7 @@ fn main() {
         }
     }
 
-    println!(
-        "Total power level at ({},{}) is {}",
-        max_coord.0, max_coord.1, max_total_power
-    );
+    (max_coord.0, max_coord.1, max_total_power)
 }
 
 fn to_idx(x: usize, y: usize, width: usize) -> usize {
