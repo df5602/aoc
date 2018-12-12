@@ -152,6 +152,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "subterranean_sustainability"
+version = "0.1.0"
+dependencies = [
+ "util 0.1.0",
+]
+
+[[package]]
 name = "sum_of_its_parts"
 version = "0.1.0"
 dependencies = [
