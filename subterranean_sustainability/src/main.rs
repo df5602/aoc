@@ -21,12 +21,12 @@ fn main() {
         }
     };
 
-    let mut initial_state = Vec::new();
+    let mut offset = -5;
+    let mut initial_state: Vec<usize> = vec![0; -offset as usize];
     let mut patterns = [0; 32];
     for line in input.iter().filter(|&s| !s.is_empty()) {
         if line.starts_with("initial state") {
-            initial_state = line
-                .split(':')
+            line.split(':')
                 .map(|s| s.trim())
                 .filter(|&s| !s.is_empty())
                 .filter(|&s| s.starts_with(|c| c == '.' || c == '#'))
@@ -41,7 +41,7 @@ fn main() {
                         std::process::exit(1);
                     }
                 })
-                .collect();
+                .for_each(|v| initial_state.push(v));
         } else if line.starts_with(|c| c == '.' || c == '#') {
             let mut iter = line.split("=>").map(|s| s.trim()).filter(|s| !s.is_empty());
 
@@ -103,6 +103,79 @@ fn main() {
         }
     }
 
-    println!("{:?}", initial_state);
-    println!("{:?}", patterns);
+    for _ in 0..4 {
+        initial_state.push(0);
+    }
+
+    print_state(0, 0, &initial_state);
+
+    let mut state = initial_state;
+    for g in 1..=40 {
+        if g % (1 << 16) == 0 {
+            println!("{}", g);
+        }
+        let next_offset = calculate_next_gen(&mut state, offset, &patterns);
+        offset = next_offset;
+        //print_state(g, offset, &state);
+        //let sum = calculate_sum_of_state(-10, &state);
+        //println!("sum: {}", sum);
+    }
+
+    let sum = calculate_sum_of_state(-10, &state);
+    println!("sum: {}", sum);
+}
+
+fn calculate_next_gen(
+    current_state: &mut Vec<usize>,
+    offset: isize,
+    patterns: &[usize; 32],
+) -> isize {
+    let mut current_pattern = 0usize;
+    let mut next_offset = offset;
+
+    if current_state[5] == 1 {
+        next_offset -= 5;
+        for _ in 0..=5 {
+            current_state.insert(0, 0);
+        }
+    }
+
+    for (i, elem) in current_state.iter_mut().enumerate() {
+        current_pattern = ((current_pattern << 1) & 0x1F) | *elem;
+        let value = patterns[current_pattern];
+        if i >= 2 {
+            current_state[i - 2] = value;
+        }
+    }
+
+    let length = current_state.len();
+    if current_state[length - 5] == 1 {
+        for _ in 0..4 {
+            current_state.push(0);
+        }
+    }
+
+    next_offset
+}
+
+fn calculate_sum_of_state(offset: isize, state: &[usize]) -> isize {
+    state
+        .iter()
+        .enumerate()
+        .map(|(i, v)| *v as isize * (i as isize + offset))
+        .sum()
+}
+
+fn print_state(generation: usize, mut zero_position: isize, state: &[usize]) {
+    print!("{} ({}): ", generation, zero_position);
+    for elem in state {
+        if *elem == 0 {
+            print!(".");
+        } else if *elem == 1 {
+            print!("#");
+        } else {
+            print!("?");
+        }
+    }
+    println!();
 }
