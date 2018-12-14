@@ -59,20 +59,14 @@ fn make_recipes(
     let mut idx = 0;
     let mut idx_found = 0;
     let sequence = number_of_recipes.to_string();
-    let mut recipes = "".to_string();
-    recipes.push((state[0] + b'0') as char);
-    recipes.push((state[1] + b'0') as char);
+    let sequence: Vec<u8> = sequence.chars().map(|c| c as u8 - b'0').collect();
 
     while state.len() < number_of_recipes + recipes_in_score || (part2 && idx_found == 0) {
         let sum = state[positions.0] + state[positions.1];
         if sum > 9 {
-            let digit = sum / 10;
-            state.push(digit);
-            recipes.push((digit + b'0') as char);
+            state.push(sum / 10);
         }
-        let digit = sum - sum / 10 * 10;
-        state.push(digit);
-        recipes.push((digit + b'0') as char);
+        state.push(sum % 10);
 
         positions = (
             (positions.0 + state[positions.0] as usize + 1) % state.len(),
@@ -81,8 +75,8 @@ fn make_recipes(
 
         if part2 && state.len() >= sequence.len() {
             for i in idx..=(state.len() - sequence.len()) {
-                let recipes = &recipes[i..i + sequence.len()];
-                if recipes == sequence {
+                let recipes = &state[i..i + sequence.len()];
+                if recipes == &sequence[..] {
                     idx_found = i;
                     break;
                 }
@@ -124,5 +118,6 @@ mod tests {
         assert_eq!(9, make_recipes_part2([3, 7], 51589));
         assert_eq!(18, make_recipes_part2([3, 7], 92510));
         assert_eq!(2018, make_recipes_part2([3, 7], 59414));
+        //assert_eq!(20278122, make_recipes_part2([3, 7], 540391));
     }
 }
