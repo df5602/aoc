@@ -110,19 +110,31 @@ fn main() {
     print_state(0, 0, &initial_state);
 
     let mut state = initial_state;
-    for g in 1..=40 {
-        if g % (1 << 16) == 0 {
-            println!("{}", g);
-        }
+    let mut previous_sum = 0;
+    let mut sum_20 = 0;
+    let mut sum_199 = 0;
+    let mut sum_200 = 0;
+    for g in 1..=200 {
         let next_offset = calculate_next_gen(&mut state, offset, &patterns);
         offset = next_offset;
-        //print_state(g, offset, &state);
-        //let sum = calculate_sum_of_state(-10, &state);
-        //println!("sum: {}", sum);
+        print_state(g, offset, &state);
+        let sum = calculate_sum_of_state(offset - 1, &state);
+        println!("sum: {} ({})", sum, sum - previous_sum);
+        previous_sum = sum;
+        if g == 20 {
+            sum_20 = sum;
+        } else if g == 199 {
+            sum_199 = sum;
+        } else if g == 200 {
+            sum_200 = sum;
+        }
     }
 
-    let sum = calculate_sum_of_state(-10, &state);
-    println!("sum: {}", sum);
+    println!("sum (20 generations): {}", sum_20);
+    println!(
+        "sum (very many generations): {}",
+        (50_000_000_000u64 - 200) * (sum_200 as u64 - sum_199 as u64) + sum_200 as u64
+    );
 }
 
 fn calculate_next_gen(
@@ -140,11 +152,15 @@ fn calculate_next_gen(
         }
     }
 
-    for (i, elem) in current_state.iter_mut().enumerate() {
+    for (i, elem) in current_state.iter().enumerate() {
         current_pattern = ((current_pattern << 1) & 0x1F) | *elem;
         let value = patterns[current_pattern];
         if i >= 2 {
-            current_state[i - 2] = value;
+            let ptr = &current_state[i - 2] as *const usize;
+            unsafe {
+                let p2 = ptr as *mut usize;
+                *p2 = value;
+            }
         }
     }
 
@@ -166,7 +182,7 @@ fn calculate_sum_of_state(offset: isize, state: &[usize]) -> isize {
         .sum()
 }
 
-fn print_state(generation: usize, mut zero_position: isize, state: &[usize]) {
+fn print_state(generation: usize, zero_position: isize, state: &[usize]) {
     print!("{} ({}): ", generation, zero_position);
     for elem in state {
         if *elem == 0 {
