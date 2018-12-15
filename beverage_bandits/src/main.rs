@@ -21,13 +21,20 @@ fn main() {
         }
     };
 
-    let combat = Combat::create(&input);
+    let mut combat = Combat::create(&input);
     println!("{}", combat);
 
     combat.fight_round();
+    println!("{}", combat);
+
+    combat.fight_round();
+    println!("{}", combat);
+
+    combat.fight_round();
+    println!("{}", combat);
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 enum CombatState {
     Ongoing,
     Finished,
@@ -44,18 +51,51 @@ impl Combat {
         }
     }
 
-    fn fight_round(&self) -> CombatState {
+    fn fight_round(&mut self) -> CombatState {
         let combat_order = self.combat_order();
 
         for unit in combat_order {
             let targets = self.grid.get_targets(&unit);
+
+            // Targets left?
             if targets.is_empty() {
-                // No targets left
                 return CombatState::Finished;
+            }
+
+            // Targets reachable?
+            if targets.iter().all(|target| match target {
+                Target::Blocked(_) => true,
+                _ => false,
+            }) {
+                continue;
+            }
+
+            // Move, if necessary
+            if !targets.iter().any(|target| match target {
+                Target::Adjacent(_) => true,
+                _ => false,
+            }) {
+                let move_candidates: Vec<GridPosition> = targets
+                    .iter()
+                    .filter_map(|target| match target {
+                        Target::Open(pos) => Some(*pos),
+                        _ => None,
+                    })
+                    .collect();
+                let shortest_paths =
+                    find_shortest_paths(&self.grid, &unit.position, &move_candidates);
+
+                // Move found?
+                if shortest_paths.is_empty()
+                    || shortest_paths[0].distance == isize::max_value() as usize
+                {
+                    continue;
+                }
+                self.grid.move_unit(&unit, &shortest_paths[0].initial_step);
             }
         }
 
-        CombatState::Finished
+        CombatState::Ongoing
     }
 
     fn combat_order(&self) -> Vec<Unit> {
@@ -69,13 +109,107 @@ impl std::fmt::Display for Combat {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
+struct ShortestPath {
+    target: GridPosition,
+    distance: usize,
+    initial_step: GridPosition,
+}
+
+fn find_shortest_paths(
+    grid: &Grid,
+    position: &GridPosition,
+    targets: &[GridPosition],
+) -> Vec<ShortestPath> {
+    let mut shortest_paths = Vec::new();
+    for target in targets {
+        // Initialize search grid
+        let mut search_grid: Vec<isize> = Vec::with_capacity(grid.width * grid.height);
+        for cell in grid.grid.iter() {
+            match cell {
+                Cell::Open => search_grid.push(0),
+                Cell::Unit(_) | Cell::Wall => search_grid.push(isize::max_value()),
+            }
+        }
+
+        // Make self position non-blocked
+        search_grid[position.y * grid.width + position.x] = 0;
+
+        // Search shortest path
+        let (dist, _, step) =
+            find_shortest_paths_internal(&mut search_grid, &position, target, grid.width);
+        assert!(dist > 0);
+        shortest_paths.push(ShortestPath {
+            target: *target,
+            distance: dist as usize,
+            initial_step: step,
+        });
+    }
+
+    shortest_paths.sort_by_key(|path| path.distance);
+    shortest_paths
+}
+
+fn find_shortest_paths_internal(
+    mut search_grid: &mut Vec<isize>,
+    position: &GridPosition,
+    target: &GridPosition,
+    width: usize,
+) -> (isize, GridPosition, GridPosition) {
+    let value = search_grid[position.y * width + position.x];
+
+    // Abort if already visited (but not yet a result) or blocked
+    if value < 0 || value == isize::max_value() {
+        return (value, *position, *position);
+    }
+
+    // Abort if target found
+    if position == target {
+        return (1, *position, *position);
+    }
+
+    // Abort if we have already evaluated this cell
+    if value > 0 {
+        return (value + 1, *position, *position);
+    }
+
+    search_grid[position.y * width + position.x] = -1;
+    let mut min = (isize::max_value(), *position, *position);
+    let above = find_shortest_paths_internal(&mut search_grid, &position.above(), target, width);
+    if above.0 > 0 && above.0 < min.0 {
+        min = above;
+    }
+    let left = find_shortest_paths_internal(&mut search_grid, &position.left(), target, width);
+    if left.0 > 0 && left.0 < min.0 {
+        min = left;
+    }
+    let right = find_shortest_paths_internal(&mut search_grid, &position.right(), target, width);
+    if right.0 > 0 && right.0 < min.0 {
+        min = right;
+    }
+    let below = find_shortest_paths_internal(&mut search_grid, &position.below(), target, width);
+    if below.0 > 0 && below.0 < min.0 {
+        min = below;
+    }
+
+    min.2 = min.1;
+    min.1 = *position;
+
+    search_grid[position.y * width + position.x] = min.0;
+
+    if min.0 < isize::max_value() {
+        min.0 += 1;
+    }
+    min
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
 enum UnitType {
     Elf,
     Goblin,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 struct Unit {
     kind: UnitType,
     position: GridPosition,
@@ -112,7 +246,7 @@ impl Unit {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 enum Cell {
     Open,
     Wall,
@@ -135,14 +269,14 @@ impl std::fmt::Display for Cell {
     }
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 enum Target {
     Adjacent(Unit),
     Open(GridPosition),
     Blocked(Unit),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 struct GridPosition {
     x: usize,
     y: usize,
@@ -180,6 +314,22 @@ impl GridPosition {
             x: self.x + 1,
             y: self.y,
         }
+    }
+}
+
+impl Ord for GridPosition {
+    fn cmp(&self, other: &GridPosition) -> std::cmp::Ordering {
+        if self.y == other.y {
+            self.x.cmp(&other.x)
+        } else {
+            self.y.cmp(&other.y)
+        }
+    }
+}
+
+impl PartialOrd for GridPosition {
+    fn partial_cmp(&self, other: &GridPosition) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
     }
 }
 
@@ -225,14 +375,24 @@ impl Grid {
     }
 
     fn at(&self, pos: &GridPosition) -> Cell {
-        self.grid[pos.y * self.width + pos.x].clone()
+        self.grid[pos.y * self.width + pos.x]
+    }
+
+    fn move_unit(&mut self, unit: &Unit, position: &GridPosition) {
+        if let Cell::Open = self.grid[position.y * self.width + position.x] {
+            self.grid[position.y * self.width + position.x] =
+                Cell::Unit(Unit::new(unit.kind, position.x, position.y));
+            self.grid[unit.position.y * self.width + unit.position.x] = Cell::Open;
+        } else {
+            panic!("Move to occupied position: {:?} -> {:?}", unit, position);
+        }
     }
 
     fn all_units(&self) -> Vec<Unit> {
         self.grid
             .iter()
             .filter_map(|cell| match cell {
-                Cell::Unit(unit) => Some(unit.clone()),
+                Cell::Unit(unit) => Some(*unit),
                 _ => None,
             })
             .collect()
@@ -243,7 +403,7 @@ impl Grid {
         for enemy in self.grid.iter().filter_map(|cell| match cell {
             Cell::Unit(target) => {
                 if unit.is_enemy_of(target) {
-                    Some(target.clone())
+                    Some(target)
                 } else {
                     None
                 }
@@ -251,7 +411,7 @@ impl Grid {
             _ => None,
         }) {
             if unit.is_adjacent_to(&enemy) {
-                targets.push(Target::Adjacent(enemy));
+                targets.push(Target::Adjacent(*enemy));
             } else {
                 let mut open_spaces = 0;
                 if self.at(&enemy.position.above()) == Cell::Open {
@@ -271,10 +431,19 @@ impl Grid {
                     targets.push(Target::Open(enemy.position.below()));
                 }
                 if open_spaces == 0 {
-                    targets.push(Target::Blocked(enemy));
+                    targets.push(Target::Blocked(*enemy));
                 }
             }
         }
+        targets.sort_by(|a, b| match (a, b) {
+            (Target::Adjacent(a), Target::Adjacent(b)) => a.position.cmp(&b.position),
+            (Target::Adjacent(_), _) => std::cmp::Ordering::Less,
+            (Target::Open(a), Target::Open(b)) => a.cmp(b),
+            (Target::Open(_), Target::Adjacent(_)) => std::cmp::Ordering::Greater,
+            (Target::Open(_), Target::Blocked(_)) => std::cmp::Ordering::Less,
+            (Target::Blocked(a), Target::Blocked(b)) => a.position.cmp(&b.position),
+            (Target::Blocked(_), _) => std::cmp::Ordering::Greater,
+        });
         targets
     }
 }
@@ -314,5 +483,85 @@ mod tests {
         assert_eq!(Some(Unit::new(UnitType::Goblin, 2, 3)), order.next());
         assert_eq!(Some(Unit::new(UnitType::Elf, 4, 3)), order.next());
         assert_eq!(None, order.next());
+    }
+
+    #[test]
+    fn test_shortest_path() {
+        /*Targets:      In range:     Reachable:    Nearest:      Chosen:
+        #######       #######       #######       #######       #######
+        #E..G.#       #E.?G?#       #E.@G.#       #E.!G.#       #E.+G.#
+        #...#.#  -->  #.?.#?#  -->  #.@.#.#  -->  #.!.#.#  -->  #...#.#
+        #.G.#G#       #?G?#G#       #@G@#G#       #!G.#G#       #.G.#G#
+        #######       #######       #######       #######       #######*/
+
+        let input = vec![
+            "#######".to_string(),
+            "#E..G.#".to_string(),
+            "#...#.#".to_string(),
+            "#.G.#G#".to_string(),
+            "#######".to_string(),
+        ];
+        let combat = Combat::create(&input);
+        let shortest_paths = find_shortest_paths(
+            &combat.grid,
+            &GridPosition { x: 1, y: 1 },
+            &[
+                GridPosition { x: 3, y: 1 },
+                GridPosition { x: 5, y: 1 },
+                GridPosition { x: 2, y: 2 },
+                GridPosition { x: 5, y: 2 },
+                GridPosition { x: 1, y: 3 },
+                GridPosition { x: 3, y: 3 },
+            ],
+        );
+
+        assert_eq!(
+            ShortestPath {
+                target: GridPosition { x: 3, y: 1 },
+                distance: 3,
+                initial_step: GridPosition { x: 2, y: 1 },
+            },
+            shortest_paths[0]
+        );
+        assert_eq!(
+            ShortestPath {
+                target: GridPosition { x: 2, y: 2 },
+                distance: 3,
+                initial_step: GridPosition { x: 2, y: 1 },
+            },
+            shortest_paths[1]
+        );
+        assert_eq!(
+            ShortestPath {
+                target: GridPosition { x: 1, y: 3 },
+                distance: 3,
+                initial_step: GridPosition { x: 1, y: 2 },
+            },
+            shortest_paths[2]
+        );
+        assert_eq!(
+            ShortestPath {
+                target: GridPosition { x: 3, y: 3 },
+                distance: 5,
+                initial_step: GridPosition { x: 2, y: 1 },
+            },
+            shortest_paths[3]
+        );
+        assert_eq!(
+            ShortestPath {
+                target: GridPosition { x: 5, y: 1 },
+                distance: isize::max_value() as usize,
+                initial_step: GridPosition { x: 1, y: 1 },
+            },
+            shortest_paths[4]
+        );
+        assert_eq!(
+            ShortestPath {
+                target: GridPosition { x: 5, y: 2 },
+                distance: isize::max_value() as usize,
+                initial_step: GridPosition { x: 1, y: 1 },
+            },
+            shortest_paths[5]
+        );
     }
 }
