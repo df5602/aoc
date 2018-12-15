@@ -63,12 +63,13 @@ impl Combat {
 
     fn fight_round(&mut self) -> CombatState {
         let combat_order = self.combat_order();
+        let mut dead_units = Vec::new();
 
         for unit in combat_order {
             let mut unit = unit;
 
             // Is unit still alive?
-            if let Cell::Open = self.grid.at(&unit.position) {
+            if dead_units.contains(&unit) {
                 continue;
             }
 
@@ -116,7 +117,9 @@ impl Combat {
 
             // Attack, if possible
             if let Some(victim) = self.select_victim(&unit) {
-                self.grid.attack(&unit, &victim);
+                if self.grid.attack(&unit, &victim) {
+                    dead_units.push(victim);
+                }
             }
         }
 
@@ -499,10 +502,11 @@ impl Grid {
         }
     }
 
-    fn attack(&mut self, attacker: &Unit, victim: &Unit) {
+    fn attack(&mut self, attacker: &Unit, victim: &Unit) -> bool {
         let hit_points = victim.hit_points - attacker.attack_power as isize;
         if hit_points <= 0 {
             self.grid[victim.position.y * self.width + victim.position.x] = Cell::Open;
+            true
         } else {
             self.grid[victim.position.y * self.width + victim.position.x] = Cell::Unit(Unit::new(
                 victim.kind,
@@ -511,6 +515,7 @@ impl Grid {
                 hit_points,
                 victim.attack_power,
             ));
+            false
         }
     }
 
