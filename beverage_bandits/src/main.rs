@@ -21,15 +21,15 @@ fn main() {
         }
     };
 
-    let game = Game::create(&input);
-    println!("{}", game);
+    let combat = Combat::create(&input);
+    println!("{}", combat);
 }
 
-struct Game {
+struct Combat {
     grid: Grid,
 }
 
-impl Game {
+impl Combat {
     fn create(input: &[String]) -> Self {
         Self {
             grid: Grid::create(&input),
@@ -37,7 +37,7 @@ impl Game {
     }
 }
 
-impl std::fmt::Display for Game {
+impl std::fmt::Display for Combat {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", self.grid)
     }
