@@ -6,8 +6,8 @@
 //! ```no_run
 //! use util::input::{FileReader, FromFile};
 //!
-//! let strings: Vec<String> = FileReader::read_from_file("string_input.txt").unwrap();
-//! let doubles: Vec<f64> = FileReader::read_from_file("double_input.txt").unwrap();
+//! let strings: Vec<String> = FileReader::new().read_from_file("string_input.txt").unwrap();
+//! let doubles: Vec<f64> = FileReader::new().read_from_file("double_input.txt").unwrap();
 //! ```
 
 use std::fs::File;
