@@ -23,18 +23,26 @@ fn main() {
 
     let mut combat = Combat::create(&input);
     println!("{}", combat);
+    loop {
+        let result = combat.fight_round();
+        if result == CombatState::Finished {
+            break;
+        }
+        println!("After round {}", combat.completed_rounds);
+        println!("{}", combat);
+    }
 
-    combat.fight_round();
-    println!("{}", combat);
-
-    combat.fight_round();
-    println!("{}", combat);
-
-    combat.fight_round();
-    println!("{}", combat);
+    let completed_round = combat.completed_rounds;
+    let sum_of_hp = combat.calculate_sum_of_hit_points();
+    println!(
+        "Completed rounds: {}, Sum of hit points: {} => {}",
+        completed_round,
+        sum_of_hp,
+        completed_round * sum_of_hp
+    );
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 enum CombatState {
     Ongoing,
     Finished,
@@ -42,12 +50,14 @@ enum CombatState {
 
 struct Combat {
     grid: Grid,
+    completed_rounds: usize,
 }
 
 impl Combat {
     fn create(input: &[String]) -> Self {
         Self {
             grid: Grid::create(&input),
+            completed_rounds: 0,
         }
     }
 
@@ -55,6 +65,13 @@ impl Combat {
         let combat_order = self.combat_order();
 
         for unit in combat_order {
+            let mut unit = unit;
+
+            // Is unit still alive?
+            if let Cell::Open = self.grid.at(&unit.position) {
+                continue;
+            }
+
             let targets = self.grid.get_targets(&unit);
 
             // Targets left?
@@ -91,15 +108,62 @@ impl Combat {
                 {
                     continue;
                 }
-                self.grid.move_unit(&unit, &shortest_paths[0].initial_step);
+
+                let next_position = shortest_paths[0].initial_step;
+                self.grid.move_unit(&unit, &next_position);
+                unit.position = next_position;
+            }
+
+            // Attack, if possible
+            if let Some(victim) = self.select_victim(&unit) {
+                self.grid.attack(&unit, &victim);
             }
         }
 
+        self.completed_rounds += 1;
         CombatState::Ongoing
+    }
+
+    fn calculate_sum_of_hit_points(&self) -> usize {
+        self.grid
+            .all_units()
+            .iter()
+            .map(|unit| unit.hit_points)
+            .fold(0, |sum, hp| sum + hp as usize)
     }
 
     fn combat_order(&self) -> Vec<Unit> {
         self.grid.all_units()
+    }
+
+    fn select_victim(&self, unit: &Unit) -> Option<Unit> {
+        let mut min_hit_points = isize::max_value();
+        let mut victim = None;
+        if let Cell::Unit(enemy) = self.grid.at(&unit.position.above()) {
+            if enemy.is_enemy_of(&unit) && enemy.hit_points < min_hit_points {
+                min_hit_points = enemy.hit_points;
+                victim = Some(enemy);
+            }
+        }
+        if let Cell::Unit(enemy) = self.grid.at(&unit.position.left()) {
+            if enemy.is_enemy_of(&unit) && enemy.hit_points < min_hit_points {
+                min_hit_points = enemy.hit_points;
+                victim = Some(enemy);
+            }
+        }
+        if let Cell::Unit(enemy) = self.grid.at(&unit.position.right()) {
+            if enemy.is_enemy_of(&unit) && enemy.hit_points < min_hit_points {
+                min_hit_points = enemy.hit_points;
+                victim = Some(enemy);
+            }
+        }
+        if let Cell::Unit(enemy) = self.grid.at(&unit.position.below()) {
+            if enemy.is_enemy_of(&unit) && enemy.hit_points < min_hit_points {
+                victim = Some(enemy);
+            }
+        }
+
+        victim
     }
 }
 
@@ -137,7 +201,7 @@ fn find_shortest_paths(
 
         // Search shortest path
         let (dist, _, step) =
-            find_shortest_paths_internal(&mut search_grid, &position, target, grid.width);
+            find_shortest_paths_internal(&mut search_grid, &position, target, grid.width, 0);
         assert!(dist > 0);
         shortest_paths.push(ShortestPath {
             target: *target,
@@ -155,6 +219,7 @@ fn find_shortest_paths_internal(
     position: &GridPosition,
     target: &GridPosition,
     width: usize,
+    depth: usize,
 ) -> (isize, GridPosition, GridPosition) {
     let value = search_grid[position.y * width + position.x];
 
@@ -175,19 +240,47 @@ fn find_shortest_paths_internal(
 
     search_grid[position.y * width + position.x] = -1;
     let mut min = (isize::max_value(), *position, *position);
-    let above = find_shortest_paths_internal(&mut search_grid, &position.above(), target, width);
+    let above = find_shortest_paths_internal(
+        &mut search_grid,
+        &position.above(),
+        target,
+        width,
+        depth + 1,
+    );
     if above.0 > 0 && above.0 < min.0 {
         min = above;
     }
-    let left = find_shortest_paths_internal(&mut search_grid, &position.left(), target, width);
+    if depth == 0 {
+        clean_visited_cells(&mut search_grid);
+    }
+    let left =
+        find_shortest_paths_internal(&mut search_grid, &position.left(), target, width, depth + 1);
     if left.0 > 0 && left.0 < min.0 {
         min = left;
     }
-    let right = find_shortest_paths_internal(&mut search_grid, &position.right(), target, width);
+    if depth == 0 {
+        clean_visited_cells(&mut search_grid);
+    }
+    let right = find_shortest_paths_internal(
+        &mut search_grid,
+        &position.right(),
+        target,
+        width,
+        depth + 1,
+    );
     if right.0 > 0 && right.0 < min.0 {
         min = right;
     }
-    let below = find_shortest_paths_internal(&mut search_grid, &position.below(), target, width);
+    if depth == 0 {
+        clean_visited_cells(&mut search_grid);
+    }
+    let below = find_shortest_paths_internal(
+        &mut search_grid,
+        &position.below(),
+        target,
+        width,
+        depth + 1,
+    );
     if below.0 > 0 && below.0 < min.0 {
         min = below;
     }
@@ -195,12 +288,21 @@ fn find_shortest_paths_internal(
     min.2 = min.1;
     min.1 = *position;
 
-    search_grid[position.y * width + position.x] = min.0;
+    if min.0 < isize::max_value() {
+        search_grid[position.y * width + position.x] = min.0;
+    }
 
     if min.0 < isize::max_value() {
         min.0 += 1;
     }
     min
+}
+
+fn clean_visited_cells(search_grid: &mut Vec<isize>) {
+    search_grid
+        .iter_mut()
+        .filter(|c| **c == -1)
+        .for_each(|c| *c = 0);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -213,13 +315,17 @@ enum UnitType {
 struct Unit {
     kind: UnitType,
     position: GridPosition,
+    hit_points: isize,
+    attack_power: usize,
 }
 
 impl Unit {
-    fn new(kind: UnitType, x: usize, y: usize) -> Self {
+    fn new(kind: UnitType, x: usize, y: usize, hit_points: isize, attack_power: usize) -> Self {
         Self {
             kind,
             position: GridPosition { x, y },
+            hit_points,
+            attack_power,
         }
     }
 
@@ -354,8 +460,8 @@ impl Grid {
             let cell = match c {
                 '.' => Cell::Open,
                 '#' => Cell::Wall,
-                'E' => Cell::Unit(Unit::new(UnitType::Elf, x, y)),
-                'G' => Cell::Unit(Unit::new(UnitType::Goblin, x, y)),
+                'E' => Cell::Unit(Unit::new(UnitType::Elf, x, y, 200, 3)),
+                'G' => Cell::Unit(Unit::new(UnitType::Goblin, x, y, 200, 3)),
                 _ => panic!("unexpected input!"),
             };
             grid.push(cell);
@@ -380,11 +486,31 @@ impl Grid {
 
     fn move_unit(&mut self, unit: &Unit, position: &GridPosition) {
         if let Cell::Open = self.grid[position.y * self.width + position.x] {
-            self.grid[position.y * self.width + position.x] =
-                Cell::Unit(Unit::new(unit.kind, position.x, position.y));
+            self.grid[position.y * self.width + position.x] = Cell::Unit(Unit::new(
+                unit.kind,
+                position.x,
+                position.y,
+                unit.hit_points,
+                unit.attack_power,
+            ));
             self.grid[unit.position.y * self.width + unit.position.x] = Cell::Open;
         } else {
             panic!("Move to occupied position: {:?} -> {:?}", unit, position);
+        }
+    }
+
+    fn attack(&mut self, attacker: &Unit, victim: &Unit) {
+        let hit_points = victim.hit_points - attacker.attack_power as isize;
+        if hit_points <= 0 {
+            self.grid[victim.position.y * self.width + victim.position.x] = Cell::Open;
+        } else {
+            self.grid[victim.position.y * self.width + victim.position.x] = Cell::Unit(Unit::new(
+                victim.kind,
+                victim.position.x,
+                victim.position.y,
+                hit_points,
+                victim.attack_power,
+            ));
         }
     }
 
@@ -475,13 +601,22 @@ mod tests {
         ];
         let combat = Combat::create(&input);
         let mut order = combat.combat_order().into_iter();
-        assert_eq!(Some(Unit::new(UnitType::Goblin, 2, 1)), order.next());
-        assert_eq!(Some(Unit::new(UnitType::Elf, 4, 1)), order.next());
-        assert_eq!(Some(Unit::new(UnitType::Elf, 1, 2)), order.next());
-        assert_eq!(Some(Unit::new(UnitType::Goblin, 3, 2)), order.next());
-        assert_eq!(Some(Unit::new(UnitType::Elf, 5, 2)), order.next());
-        assert_eq!(Some(Unit::new(UnitType::Goblin, 2, 3)), order.next());
-        assert_eq!(Some(Unit::new(UnitType::Elf, 4, 3)), order.next());
+        assert_eq!(
+            Some(Unit::new(UnitType::Goblin, 2, 1, 200, 3)),
+            order.next()
+        );
+        assert_eq!(Some(Unit::new(UnitType::Elf, 4, 1, 200, 3)), order.next());
+        assert_eq!(Some(Unit::new(UnitType::Elf, 1, 2, 200, 3)), order.next());
+        assert_eq!(
+            Some(Unit::new(UnitType::Goblin, 3, 2, 200, 3)),
+            order.next()
+        );
+        assert_eq!(Some(Unit::new(UnitType::Elf, 5, 2, 200, 3)), order.next());
+        assert_eq!(
+            Some(Unit::new(UnitType::Goblin, 2, 3, 200, 3)),
+            order.next()
+        );
+        assert_eq!(Some(Unit::new(UnitType::Elf, 4, 3, 200, 3)), order.next());
         assert_eq!(None, order.next());
     }
 
