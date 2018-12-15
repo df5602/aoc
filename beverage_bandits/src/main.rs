@@ -25,6 +25,12 @@ fn main() {
     println!("{}", combat);
 }
 
+#[derive(Debug)]
+enum CombatState {
+    Ongoing,
+    Finished,
+}
+
 struct Combat {
     grid: Grid,
 }
@@ -35,6 +41,23 @@ impl Combat {
             grid: Grid::create(&input),
         }
     }
+
+    fn fight_round(&self) -> CombatState {
+        let combat_order = self.combat_order();
+
+        CombatState::Finished
+    }
+
+    fn combat_order(&self) -> Vec<Unit> {
+        self.grid
+            .grid
+            .iter()
+            .filter_map(|c| match c {
+                Cell::Unit(unit) => Some(unit.clone()),
+                _ => None,
+            })
+            .collect()
+    }
 }
 
 impl std::fmt::Display for Combat {
@@ -43,18 +66,28 @@ impl std::fmt::Display for Combat {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 enum UnitType {
     Elf,
     Goblin,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 struct Unit {
     kind: UnitType,
+    pos_x: usize,
+    pos_y: usize,
 }
 
 impl Unit {
+    fn new(kind: UnitType, x: usize, y: usize) -> Self {
+        Self {
+            kind,
+            pos_x: x,
+            pos_y: y,
+        }
+    }
+
     fn is_goblin(&self) -> bool {
         match self.kind {
             UnitType::Elf => false,
@@ -108,19 +141,23 @@ impl Grid {
         };
 
         let mut grid = Vec::with_capacity(width * height);
+        let mut x = 0;
+        let mut y = 0;
         input.iter().flat_map(|s| s.chars()).for_each(|c| {
             let cell = match c {
                 '.' => Cell::Open,
                 '#' => Cell::Wall,
-                'E' => Cell::Unit(Unit {
-                    kind: UnitType::Elf,
-                }),
-                'G' => Cell::Unit(Unit {
-                    kind: UnitType::Goblin,
-                }),
+                'E' => Cell::Unit(Unit::new(UnitType::Elf, x, y)),
+                'G' => Cell::Unit(Unit::new(UnitType::Goblin, x, y)),
                 _ => panic!("unexpected input!"),
             };
             grid.push(cell);
+
+            x += 1;
+            if x >= width {
+                x = 0;
+                y += 1;
+            }
         });
 
         Self {
@@ -140,5 +177,80 @@ impl std::fmt::Display for Grid {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_combat_order() {
+        let input = vec![
+            "#######".to_string(),
+            "#.G.E.#".to_string(),
+            "#E.G.E#".to_string(),
+            "#.G.E.#".to_string(),
+            "#######".to_string(),
+        ];
+        let combat = Combat::create(&input);
+        let mut order = combat.combat_order().into_iter();
+        assert_eq!(
+            Some(Unit {
+                kind: UnitType::Goblin,
+                pos_x: 2,
+                pos_y: 1
+            }),
+            order.next()
+        );
+        assert_eq!(
+            Some(Unit {
+                kind: UnitType::Elf,
+                pos_x: 4,
+                pos_y: 1
+            }),
+            order.next()
+        );
+        assert_eq!(
+            Some(Unit {
+                kind: UnitType::Elf,
+                pos_x: 1,
+                pos_y: 2
+            }),
+            order.next()
+        );
+        assert_eq!(
+            Some(Unit {
+                kind: UnitType::Goblin,
+                pos_x: 3,
+                pos_y: 2
+            }),
+            order.next()
+        );
+        assert_eq!(
+            Some(Unit {
+                kind: UnitType::Elf,
+                pos_x: 5,
+                pos_y: 2
+            }),
+            order.next()
+        );
+        assert_eq!(
+            Some(Unit {
+                kind: UnitType::Goblin,
+                pos_x: 2,
+                pos_y: 3
+            }),
+            order.next()
+        );
+        assert_eq!(
+            Some(Unit {
+                kind: UnitType::Elf,
+                pos_x: 4,
+                pos_y: 3
+            }),
+            order.next()
+        );
+        assert_eq!(None, order.next());
     }
 }
