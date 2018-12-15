@@ -23,6 +23,8 @@ fn main() {
 
     let combat = Combat::create(&input);
     println!("{}", combat);
+
+    combat.fight_round();
 }
 
 #[derive(Debug)]
@@ -45,18 +47,19 @@ impl Combat {
     fn fight_round(&self) -> CombatState {
         let combat_order = self.combat_order();
 
+        for unit in combat_order {
+            let targets = self.grid.get_targets(&unit);
+            if targets.is_empty() {
+                // No targets left
+                return CombatState::Finished;
+            }
+        }
+
         CombatState::Finished
     }
 
     fn combat_order(&self) -> Vec<Unit> {
-        self.grid
-            .grid
-            .iter()
-            .filter_map(|c| match c {
-                Cell::Unit(unit) => Some(unit.clone()),
-                _ => None,
-            })
-            .collect()
+        self.grid.all_units()
     }
 }
 
@@ -75,16 +78,14 @@ enum UnitType {
 #[derive(Debug, Clone, PartialEq)]
 struct Unit {
     kind: UnitType,
-    pos_x: usize,
-    pos_y: usize,
+    position: GridPosition,
 }
 
 impl Unit {
     fn new(kind: UnitType, x: usize, y: usize) -> Self {
         Self {
             kind,
-            pos_x: x,
-            pos_y: y,
+            position: GridPosition { x, y },
         }
     }
 
@@ -101,9 +102,17 @@ impl Unit {
             UnitType::Goblin => false,
         }
     }
+
+    fn is_adjacent_to(&self, other: &Unit) -> bool {
+        self.position.is_adjacent_to(&other.position)
+    }
+
+    fn is_enemy_of(&self, other: &Unit) -> bool {
+        self.kind != other.kind
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 enum Cell {
     Open,
     Wall,
@@ -122,6 +131,54 @@ impl std::fmt::Display for Cell {
                     write!(f, "G")
                 }
             }
+        }
+    }
+}
+
+#[derive(Debug)]
+enum Target {
+    Adjacent(Unit),
+    Open(GridPosition),
+    Blocked(Unit),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct GridPosition {
+    x: usize,
+    y: usize,
+}
+
+impl GridPosition {
+    fn is_adjacent_to(&self, other: &GridPosition) -> bool {
+        (other.y == self.y && (other.x + 1 == self.x || self.x + 1 == other.x))
+            || (other.x == self.x && (other.y + 1 == self.y || self.y + 1 == other.y))
+    }
+
+    fn above(&self) -> GridPosition {
+        GridPosition {
+            x: self.x,
+            y: self.y - 1,
+        }
+    }
+
+    fn below(&self) -> GridPosition {
+        GridPosition {
+            x: self.x,
+            y: self.y + 1,
+        }
+    }
+
+    fn left(&self) -> GridPosition {
+        GridPosition {
+            x: self.x - 1,
+            y: self.y,
+        }
+    }
+
+    fn right(&self) -> GridPosition {
+        GridPosition {
+            x: self.x + 1,
+            y: self.y,
         }
     }
 }
@@ -166,6 +223,60 @@ impl Grid {
             grid,
         }
     }
+
+    fn at(&self, pos: &GridPosition) -> Cell {
+        self.grid[pos.y * self.width + pos.x].clone()
+    }
+
+    fn all_units(&self) -> Vec<Unit> {
+        self.grid
+            .iter()
+            .filter_map(|cell| match cell {
+                Cell::Unit(unit) => Some(unit.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn get_targets(&self, unit: &Unit) -> Vec<Target> {
+        let mut targets = Vec::new();
+        for enemy in self.grid.iter().filter_map(|cell| match cell {
+            Cell::Unit(target) => {
+                if unit.is_enemy_of(target) {
+                    Some(target.clone())
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }) {
+            if unit.is_adjacent_to(&enemy) {
+                targets.push(Target::Adjacent(enemy));
+            } else {
+                let mut open_spaces = 0;
+                if self.at(&enemy.position.above()) == Cell::Open {
+                    open_spaces += 1;
+                    targets.push(Target::Open(enemy.position.above()));
+                }
+                if self.at(&enemy.position.left()) == Cell::Open {
+                    open_spaces += 1;
+                    targets.push(Target::Open(enemy.position.left()));
+                }
+                if self.at(&enemy.position.right()) == Cell::Open {
+                    open_spaces += 1;
+                    targets.push(Target::Open(enemy.position.right()));
+                }
+                if self.at(&enemy.position.below()) == Cell::Open {
+                    open_spaces += 1;
+                    targets.push(Target::Open(enemy.position.below()));
+                }
+                if open_spaces == 0 {
+                    targets.push(Target::Blocked(enemy));
+                }
+            }
+        }
+        targets
+    }
 }
 
 impl std::fmt::Display for Grid {
@@ -195,62 +306,13 @@ mod tests {
         ];
         let combat = Combat::create(&input);
         let mut order = combat.combat_order().into_iter();
-        assert_eq!(
-            Some(Unit {
-                kind: UnitType::Goblin,
-                pos_x: 2,
-                pos_y: 1
-            }),
-            order.next()
-        );
-        assert_eq!(
-            Some(Unit {
-                kind: UnitType::Elf,
-                pos_x: 4,
-                pos_y: 1
-            }),
-            order.next()
-        );
-        assert_eq!(
-            Some(Unit {
-                kind: UnitType::Elf,
-                pos_x: 1,
-                pos_y: 2
-            }),
-            order.next()
-        );
-        assert_eq!(
-            Some(Unit {
-                kind: UnitType::Goblin,
-                pos_x: 3,
-                pos_y: 2
-            }),
-            order.next()
-        );
-        assert_eq!(
-            Some(Unit {
-                kind: UnitType::Elf,
-                pos_x: 5,
-                pos_y: 2
-            }),
-            order.next()
-        );
-        assert_eq!(
-            Some(Unit {
-                kind: UnitType::Goblin,
-                pos_x: 2,
-                pos_y: 3
-            }),
-            order.next()
-        );
-        assert_eq!(
-            Some(Unit {
-                kind: UnitType::Elf,
-                pos_x: 4,
-                pos_y: 3
-            }),
-            order.next()
-        );
+        assert_eq!(Some(Unit::new(UnitType::Goblin, 2, 1)), order.next());
+        assert_eq!(Some(Unit::new(UnitType::Elf, 4, 1)), order.next());
+        assert_eq!(Some(Unit::new(UnitType::Elf, 1, 2)), order.next());
+        assert_eq!(Some(Unit::new(UnitType::Goblin, 3, 2)), order.next());
+        assert_eq!(Some(Unit::new(UnitType::Elf, 5, 2)), order.next());
+        assert_eq!(Some(Unit::new(UnitType::Goblin, 2, 3)), order.next());
+        assert_eq!(Some(Unit::new(UnitType::Elf, 4, 3)), order.next());
         assert_eq!(None, order.next());
     }
 }
