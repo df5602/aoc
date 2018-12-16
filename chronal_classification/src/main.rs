@@ -68,24 +68,10 @@ fn main() {
         three_or_more
     );
 
-    let mut possibilities: [Vec<Opcode>; 16] = [
-        opcodes.to_vec(),
-        opcodes.to_vec(),
-        opcodes.to_vec(),
-        opcodes.to_vec(),
-        opcodes.to_vec(),
-        opcodes.to_vec(),
-        opcodes.to_vec(),
-        opcodes.to_vec(),
-        opcodes.to_vec(),
-        opcodes.to_vec(),
-        opcodes.to_vec(),
-        opcodes.to_vec(),
-        opcodes.to_vec(),
-        opcodes.to_vec(),
-        opcodes.to_vec(),
-        opcodes.to_vec(),
-    ];
+    let mut possibilities: [Vec<Opcode>; 16] = Default::default();
+    for p in &mut possibilities {
+        *p = opcodes.to_vec();
+    }
 
     let mut matches: HashMap<u8, Opcode> = HashMap::new();
 
@@ -110,8 +96,8 @@ fn main() {
                         panic!("Opcode is not unique!");
                     }
 
-                    for poss in &mut possibilities {
-                        poss.retain(|&opcode| opcode != found_op);
+                    for p in &mut possibilities {
+                        p.retain(|&opcode| opcode != found_op);
                     }
 
                     found_this_iteration += 1;
