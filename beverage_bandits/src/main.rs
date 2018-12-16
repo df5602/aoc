@@ -1,6 +1,7 @@
 extern crate util;
 
 use std::env;
+use std::io::BufRead;
 
 use util::input::{FileReader, FromFile};
 
@@ -30,6 +31,8 @@ fn main() {
         }
         println!("After round {}", combat.completed_rounds);
         println!("{}", combat);
+        //let mut input_buffer = String::new();
+        //let _ = std::io::stdin().lock().read_line(&mut input_buffer);
     }
 
     let completed_round = combat.completed_rounds;
@@ -293,6 +296,7 @@ fn find_shortest_paths_internal(
 
     if min.0 < isize::max_value() {
         search_grid[position.y * width + position.x] = min.0;
+        clean_neighbour_cells(&mut search_grid, &position, width)
     }
 
     if min.0 < isize::max_value() {
@@ -304,8 +308,23 @@ fn find_shortest_paths_internal(
 fn clean_visited_cells(search_grid: &mut Vec<isize>) {
     search_grid
         .iter_mut()
-        .filter(|c| **c == -1)
+        .filter(|c| **c < isize::max_value())
         .for_each(|c| *c = 0);
+}
+
+fn clean_neighbour_cells(search_grid: &mut Vec<isize>, position: &GridPosition, width: usize) {
+    if search_grid[(position.y - 1) * width + position.x] < 0 {
+        search_grid[(position.y - 1) * width + position.x] = 0;
+    }
+    if search_grid[position.y * width + position.x - 1] < 0 {
+        search_grid[position.y * width + position.x - 1] = 0;
+    }
+    if search_grid[position.y * width + position.x + 1] < 0 {
+        search_grid[position.y * width + position.x + 1] = 0;
+    }
+    if search_grid[(position.y + 1) * width + position.x] < 0 {
+        search_grid[(position.y + 1) * width + position.x] = 0;
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -488,6 +507,13 @@ impl Grid {
     }
 
     fn move_unit(&mut self, unit: &Unit, position: &GridPosition) {
+        let unit =
+            if let Cell::Unit(unit) = self.grid[unit.position.y * self.width + unit.position.x] {
+                unit
+            } else {
+                panic!("Original position was not occupied by unit!");
+            };
+
         if let Cell::Open = self.grid[position.y * self.width + position.x] {
             self.grid[position.y * self.width + position.x] = Cell::Unit(Unit::new(
                 unit.kind,
