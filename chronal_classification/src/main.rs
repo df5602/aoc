@@ -1,5 +1,6 @@
 extern crate util;
 
+use std::collections::HashMap;
 use std::env;
 
 use util::input::{FileReader, FromFile};
@@ -42,13 +43,15 @@ fn main() {
     ];
 
     let mut three_or_more = 0;
-    for sample in instruction_samples {
+    for sample in instruction_samples.iter() {
         let mut matching_opcodes = 0;
         for &opcode in opcodes.iter() {
-            let mut regs = sample.regs_before.clone();
-            evaluate_instruction(&mut regs, opcode, &sample.instruction[1..]);
-
-            if regs == sample.regs_after {
+            if matches_opcode(
+                &sample.regs_before,
+                opcode,
+                &sample.instruction[1..],
+                &sample.regs_after,
+            ) {
                 matching_opcodes += 1;
             }
         }
@@ -62,6 +65,77 @@ fn main() {
         "Number of samples that behave like three or more opcodes: {}",
         three_or_more
     );
+
+    let mut possibilities: [Vec<Opcode>; 16] = [
+        opcodes.to_vec(),
+        opcodes.to_vec(),
+        opcodes.to_vec(),
+        opcodes.to_vec(),
+        opcodes.to_vec(),
+        opcodes.to_vec(),
+        opcodes.to_vec(),
+        opcodes.to_vec(),
+        opcodes.to_vec(),
+        opcodes.to_vec(),
+        opcodes.to_vec(),
+        opcodes.to_vec(),
+        opcodes.to_vec(),
+        opcodes.to_vec(),
+        opcodes.to_vec(),
+        opcodes.to_vec(),
+    ];
+
+    let mut matches: HashMap<u8, Opcode> = HashMap::new();
+
+    loop {
+        let mut found_this_iteration = 0;
+
+        for sample in instruction_samples.iter() {
+            let opcode = sample.instruction[0];
+
+            if !possibilities[opcode as usize].is_empty() {
+                possibilities[opcode as usize].retain(|&opcode| {
+                    matches_opcode(
+                        &sample.regs_before,
+                        opcode,
+                        &sample.instruction[1..],
+                        &sample.regs_after,
+                    )
+                });
+                if possibilities[opcode as usize].len() == 1 {
+                    let found_op = possibilities[opcode as usize][0];
+                    if matches.insert(opcode, found_op).is_some() {
+                        panic!("Opcode is not unique!");
+                    }
+
+                    for poss in &mut possibilities {
+                        poss.retain(|&opcode| opcode != found_op);
+                    }
+
+                    found_this_iteration += 1;
+                }
+            }
+        }
+
+        if found_this_iteration == 0 || matches.len() == 16 {
+            break;
+        }
+    }
+
+    println!("Matches:");
+    for (k, v) in matches.iter() {
+        println!("{} => {:?}", k, v);
+    }
+}
+
+fn matches_opcode(regs_before: &[u8], opcode: Opcode, args: &[u8], regs_after: &[u8]) -> bool {
+    assert_eq!(4, regs_before.len());
+    let mut regs = [0; 4];
+    regs[..regs_before.len()].clone_from_slice(&regs_before[..]);
+
+    evaluate_instruction(&mut regs, opcode, &args);
+
+    regs == regs_after
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
