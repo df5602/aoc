@@ -5,6 +5,8 @@ use std::env;
 
 use util::input::{FileReader, FromFile};
 
+type RegSize = u16;
+
 fn main() {
     let input_file = match env::args().nth(1) {
         Some(input_file) => input_file,
@@ -22,7 +24,7 @@ fn main() {
         }
     };
 
-    let instruction_samples = parse_input(&input);
+    let (instruction_samples, test_program) = parse_input(&input);
     let opcodes = [
         Opcode::Addr,
         Opcode::Addi,
@@ -104,7 +106,7 @@ fn main() {
                 });
                 if possibilities[opcode as usize].len() == 1 {
                     let found_op = possibilities[opcode as usize][0];
-                    if matches.insert(opcode, found_op).is_some() {
+                    if matches.insert(opcode as u8, found_op).is_some() {
                         panic!("Opcode is not unique!");
                     }
 
@@ -126,9 +128,24 @@ fn main() {
     for (k, v) in matches.iter() {
         println!("{} => {:?}", k, v);
     }
+
+    let mut regs = [0; 4];
+    for instruction in test_program {
+        evaluate_instruction(
+            &mut regs,
+            matches[&(instruction[0] as u8)],
+            &instruction[1..],
+        );
+    }
+    println!("Value contained in register 0: {}", regs[0]);
 }
 
-fn matches_opcode(regs_before: &[u8], opcode: Opcode, args: &[u8], regs_after: &[u8]) -> bool {
+fn matches_opcode(
+    regs_before: &[RegSize],
+    opcode: Opcode,
+    args: &[RegSize],
+    regs_after: &[RegSize],
+) -> bool {
     assert_eq!(4, regs_before.len());
     let mut regs = [0; 4];
     regs[..regs_before.len()].clone_from_slice(&regs_before[..]);
@@ -158,7 +175,7 @@ enum Opcode {
     Eqrr,
 }
 
-fn evaluate_instruction(regs: &mut [u8], opcode: Opcode, arguments: &[u8]) {
+fn evaluate_instruction(regs: &mut [RegSize], opcode: Opcode, arguments: &[RegSize]) {
     assert_eq!(4, regs.len());
     assert_eq!(3, arguments.len());
 
@@ -190,9 +207,9 @@ fn evaluate_instruction(regs: &mut [u8], opcode: Opcode, arguments: &[u8]) {
 
 #[derive(Debug, Default)]
 struct InstructionSample {
-    regs_before: Vec<u8>,
-    instruction: Vec<u8>,
-    regs_after: Vec<u8>,
+    regs_before: Vec<RegSize>,
+    instruction: Vec<RegSize>,
+    regs_after: Vec<RegSize>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -201,12 +218,14 @@ enum ParseState {
     Instruction,
     After,
     Newline,
+    Program,
 }
 
-fn parse_input(input: &[String]) -> Vec<InstructionSample> {
+fn parse_input(input: &[String]) -> (Vec<InstructionSample>, Vec<Vec<RegSize>>) {
     let mut state = ParseState::Before;
     let mut sample = InstructionSample::default();
     let mut samples: Vec<InstructionSample> = Vec::new();
+    let mut program: Vec<Vec<RegSize>> = Vec::new();
 
     for line in input {
         if state == ParseState::Before && line.starts_with("Before") {
@@ -222,7 +241,7 @@ fn parse_input(input: &[String]) -> Vec<InstructionSample> {
                 .split_whitespace()
                 .map(|s| s.trim())
                 .filter(|s| !s.is_empty())
-                .map(|s| s.parse::<u8>().unwrap())
+                .map(|s| s.parse::<RegSize>().unwrap())
                 .collect();
             assert_eq!(4, sample.instruction.len());
             state = ParseState::After;
@@ -235,24 +254,31 @@ fn parse_input(input: &[String]) -> Vec<InstructionSample> {
             samples.push(parsed_sample);
             state = ParseState::Before;
         } else if state != ParseState::Newline && line.is_empty() {
-            break;
+            state = ParseState::Program;
+        } else if state == ParseState::Program && !line.is_empty() {
+            let instruction: Vec<RegSize> = line
+                .split_whitespace()
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .map(|s| s.parse::<RegSize>().unwrap())
+                .collect();
+            program.push(instruction);
         } else {
             panic!("Unexpected input!");
         }
     }
 
-    samples
+    (samples, program)
 }
 
-fn parse_registers(input: &str) -> Vec<u8> {
+fn parse_registers(input: &str) -> Vec<RegSize> {
     input
         .split(|c| c == '[' || c == ']')
         .filter(|s| !s.starts_with("Before") && !s.starts_with("After"))
         .flat_map(|s| s.split(','))
         .map(|s| s.trim())
         .filter(|s| !s.is_empty())
-        .flat_map(|s| s.chars())
-        .map(|c| c as u8 - b'0')
+        .map(|s| s.parse::<RegSize>().unwrap())
         .collect()
 }
 
