@@ -16,4 +16,5 @@ members = [
     "subterranean_sustainability",
     "chocolate_charts",
     "beverage_bandits",
+    "chronal_classification",
 ]

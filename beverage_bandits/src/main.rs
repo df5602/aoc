@@ -1,7 +1,7 @@
 extern crate util;
 
 use std::env;
-use std::io::BufRead;
+//use std::io::BufRead;
 
 use util::input::{FileReader, FromFile};
 
@@ -351,6 +351,7 @@ impl Unit {
         }
     }
 
+    #[allow(dead_code)]
     fn is_goblin(&self) -> bool {
         match self.kind {
             UnitType::Elf => false,
