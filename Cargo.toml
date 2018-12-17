@@ -17,4 +17,5 @@ members = [
     "chocolate_charts",
     "beverage_bandits",
     "chronal_classification",
+    "reservoir_research",
 ]
