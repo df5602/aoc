@@ -8,6 +8,7 @@ use std::collections::VecDeque;
 use std::env;
 use std::io::BufRead;
 use std::str::FromStr;
+use std::{thread, time};
 
 use regex::Regex;
 
@@ -79,6 +80,7 @@ struct Grid {
     lowest_y: usize,
     grid: Vec<Cell>,
     debug: bool,
+    visualize: bool,
 }
 
 impl Grid {
@@ -94,6 +96,7 @@ impl Grid {
             lowest_y: y_min,
             grid: Vec::with_capacity(width * height),
             debug: false,
+            visualize: false,
         };
 
         for _ in 0..width * height {
@@ -133,16 +136,22 @@ impl Grid {
         let mut queue = VecDeque::new();
 
         let mut count = 0;
+        let delay_short = time::Duration::from_millis(50);
+        let delay_long = time::Duration::from_millis(200);
 
         loop {
             count += 1;
 
-            if self.debug {
+            if self.debug || self.visualize {
                 println!("[{}] Current position: ({},{})", count, x, y);
 
-                self.view(x, y, 25);
-                let mut input_buffer = String::new();
-                let _ = std::io::stdin().lock().read_line(&mut input_buffer);
+                self.view(x, y, 20);
+                if self.debug {
+                    let mut input_buffer = String::new();
+                    let _ = std::io::stdin().lock().read_line(&mut input_buffer);
+                } else {
+                    thread::sleep(delay_short);
+                }
             }
 
             if self.at(x, y) == Cell::StillWater || self.at(x, y) == Cell::OutOfBounds {
@@ -222,6 +231,9 @@ impl Grid {
             }
 
             if need_next {
+                if self.visualize {
+                    thread::sleep(delay_long);
+                }
                 match queue.pop_front() {
                     Some((x_new, y_new, dir_new)) => {
                         x = x_new;
@@ -345,22 +357,10 @@ impl Grid {
         let y_orig = y;
         let x_orig = x;
 
-        let y_min = if y > size { y - size } else { 0 };
-        let y_max = if y + size < self.height {
-            y + size
-        } else {
-            self.height - 1
-        };
-        let x_min = if (x - self.offset_x) > size {
-            x - size
-        } else {
-            self.offset_x
-        };
-        let x_max = if (x - self.offset_x) + size < self.width {
-            x + size
-        } else {
-            self.width + self.offset_x - 1
-        };
+        let y_min: isize = y as isize - size as isize;
+        let y_max: isize = y as isize + size as isize;
+        let x_min: isize = x as isize - (size * 2) as isize;
+        let x_max: isize = x as isize + (size * 2) as isize;
 
         println!("View: x={}..{}, y={}..{}", x_min, x_max, y_min, y_max);
         println!(
@@ -370,10 +370,12 @@ impl Grid {
 
         for y in y_min..=y_max {
             for x in x_min..=x_max {
-                if x == x_orig && y == y_orig {
+                let idy = if y < 0 { self.height } else { y as usize };
+                let idx = if x < 0 { self.width } else { x as usize };
+                if idx == x_orig && idy == y_orig {
                     print!("x");
                 } else {
-                    print!("{}", self.at(x, y));
+                    print!("{}", self.at(idx, idy));
                 }
             }
             println!();
