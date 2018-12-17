@@ -6,3 +6,5 @@ edition = "2018"
 
 [dependencies]
 util = { path = "../util" }
+regex = "1"
+lazy_static = "1.2.0"
