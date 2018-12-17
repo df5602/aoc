@@ -182,10 +182,9 @@ impl Grid {
                         if self.debug {
                             println!("Bounded on left side => go right");
                         }
-                        for x in x_min + 1..x {
+                        for x in x_min + 1..=x {
                             self.set_at(x, y, Cell::DriedWater);
                         }
-                        self.set_at(x, y, Cell::DriedWater);
                         x += 1;
                     }
                     (None, Some(x_max)) => {
@@ -193,10 +192,9 @@ impl Grid {
                         if self.debug {
                             println!("Bounded on right side => go left");
                         }
-                        for x in x + 1..x_max {
+                        for x in x..x_max {
                             self.set_at(x, y, Cell::DriedWater);
                         }
-                        self.set_at(x, y, Cell::DriedWater);
                         x -= 1;
                     }
                     (None, None) => {
