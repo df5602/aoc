@@ -86,7 +86,8 @@ fn main() {
     let resource_value = loop_entries[(num_steps - 1 - loop_start_idx) % loop_entries.len()];
     println!(
         "Resource value after {} minutes: {}",
-        num_steps, resource_value.trees * resource_value.lumberyard
+        num_steps,
+        resource_value.trees * resource_value.lumberyard
     );
 }
 
