@@ -175,6 +175,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "settlers_of_the_north_pole"
+version = "0.1.0"
+dependencies = [
+ "util 0.1.0",
+]
+
+[[package]]
 name = "stars_align"
 version = "0.1.0"
 dependencies = [
