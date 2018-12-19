@@ -78,6 +78,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "go_with_the_flow"
+version = "0.1.0"
+dependencies = [
+ "util 0.1.0",
+]
+
+[[package]]
 name = "inventory_management_system"
 version = "0.1.0"
 dependencies = [
