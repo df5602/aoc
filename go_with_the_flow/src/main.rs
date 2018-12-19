@@ -5,7 +5,7 @@ use std::env;
 use util::input::{FileReader, FromFile};
 
 type RegSize = u32;
-const RegNumber: usize = 6;
+const REG_NUMBER: usize = 6;
 
 fn main() {
     let input_file = match env::args().nth(1) {
@@ -25,17 +25,17 @@ fn main() {
     };
 
     let program = parse_input(&input);
-    let mut regs = [0; RegNumber];
+    let mut regs = [0; REG_NUMBER];
     program.execute(&mut regs);
 
     println!("Value in register 0: {:?}", regs[0]);
 
-    /* Part 2, not brute-forceable
-    let mut regs = [0; RegNumber];
+    /* Part 2, not brute-forceable, only runs with optimized input */
+    let mut regs = [0; REG_NUMBER];
     regs[0] = 1;
     program.execute(&mut regs);
 
-    println!("Value in register 0: {:?}", regs[0]);*/
+    println!("Value in register 0: {:?}", regs[0]);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -56,10 +56,11 @@ enum Opcode {
     Eqir,
     Eqri,
     Eqrr,
+    Modr,
 }
 
 fn evaluate_instruction(regs: &mut [RegSize], opcode: Opcode, arguments: &[RegSize]) {
-    assert_eq!(RegNumber, regs.len());
+    assert_eq!(REG_NUMBER, regs.len());
     assert_eq!(3, arguments.len());
 
     let a = arguments[0] as usize;
@@ -85,6 +86,7 @@ fn evaluate_instruction(regs: &mut [RegSize], opcode: Opcode, arguments: &[RegSi
         Opcode::Eqir => regs[output] = if imma == regs[b] { 1 } else { 0 },
         Opcode::Eqri => regs[output] = if regs[a] == immb { 1 } else { 0 },
         Opcode::Eqrr => regs[output] = if regs[a] == regs[b] { 1 } else { 0 },
+        Opcode::Modr => regs[output] = regs[a] % regs[b],
     }
 }
 
@@ -102,7 +104,7 @@ struct Program {
 
 impl Program {
     fn execute(&self, mut regs: &mut [RegSize]) {
-        assert_eq!(RegNumber, regs.len());
+        assert_eq!(REG_NUMBER, regs.len());
         loop {
             let ip = regs[self.ip as usize];
             if (ip as usize) >= self.instructions.len() {
@@ -133,8 +135,11 @@ fn parse_input(input: &[String]) -> Program {
                 .map(|s| s.parse::<RegSize>().unwrap())
                 .nth(0)
                 .unwrap();
-            assert!((ip as usize) < RegNumber);
+            assert!((ip as usize) < REG_NUMBER);
             got_ip = true;
+        } else if line.starts_with(';') {
+            // skip comments
+            continue;
         } else {
             let mut iter = line.split_whitespace();
             let opcode = match iter.next().unwrap() {
@@ -154,6 +159,7 @@ fn parse_input(input: &[String]) -> Program {
                 "eqir" => Opcode::Eqir,
                 "eqri" => Opcode::Eqri,
                 "eqrr" => Opcode::Eqrr,
+                "modr" => Opcode::Modr,
                 s => panic!("Unknown opcode: {}", s),
             };
             let mut args: [RegSize; 3] = [0; 3];
