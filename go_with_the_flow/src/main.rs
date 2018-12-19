@@ -4,7 +4,8 @@ use std::env;
 
 use util::input::{FileReader, FromFile};
 
-type RegSize = u16;
+type RegSize = u32;
+const RegNumber: usize = 6;
 
 fn main() {
     let input_file = match env::args().nth(1) {
@@ -24,8 +25,17 @@ fn main() {
     };
 
     let program = parse_input(&input);
+    let mut regs = [0; RegNumber];
+    program.execute(&mut regs);
 
-    println!("{:?}", program);
+    println!("Value in register 0: {:?}", regs[0]);
+
+    /* Part 2, not brute-forceable
+    let mut regs = [0; RegNumber];
+    regs[0] = 1;
+    program.execute(&mut regs);
+
+    println!("Value in register 0: {:?}", regs[0]);*/
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -49,7 +59,7 @@ enum Opcode {
 }
 
 fn evaluate_instruction(regs: &mut [RegSize], opcode: Opcode, arguments: &[RegSize]) {
-    assert_eq!(4, regs.len());
+    assert_eq!(RegNumber, regs.len());
     assert_eq!(3, arguments.len());
 
     let a = arguments[0] as usize;
@@ -90,6 +100,22 @@ struct Program {
     instructions: Vec<Instruction>,
 }
 
+impl Program {
+    fn execute(&self, mut regs: &mut [RegSize]) {
+        assert_eq!(RegNumber, regs.len());
+        loop {
+            let ip = regs[self.ip as usize];
+            if (ip as usize) >= self.instructions.len() {
+                break;
+            }
+
+            let instruction = &self.instructions[ip as usize];
+            evaluate_instruction(&mut regs, instruction.opcode, &instruction.args);
+            regs[self.ip as usize] += 1;
+        }
+    }
+}
+
 fn parse_input(input: &[String]) -> Program {
     let mut ip = 0;
     let mut got_ip = false;
@@ -107,6 +133,7 @@ fn parse_input(input: &[String]) -> Program {
                 .map(|s| s.parse::<RegSize>().unwrap())
                 .nth(0)
                 .unwrap();
+            assert!((ip as usize) < RegNumber);
             got_ip = true;
         } else {
             let mut iter = line.split_whitespace();
@@ -147,143 +174,143 @@ mod tests {
 
     #[test]
     fn addr() {
-        let mut registers = [0, 1, 2, 0];
+        let mut registers = [0, 1, 2, 0, 0, 0];
         evaluate_instruction(&mut registers, Opcode::Addr, &[1, 2, 3]);
-        assert_eq!([0, 1, 2, 3], registers);
+        assert_eq!([0, 1, 2, 3, 0, 0], registers);
 
         evaluate_instruction(&mut registers, Opcode::Addr, &[2, 3, 1]);
-        assert_eq!([0, 5, 2, 3], registers);
+        assert_eq!([0, 5, 2, 3, 0, 0], registers);
     }
 
     #[test]
     fn addi() {
-        let mut registers = [0, 1, 2, 0];
+        let mut registers = [0, 1, 2, 0, 0, 0];
         evaluate_instruction(&mut registers, Opcode::Addi, &[1, 5, 3]);
-        assert_eq!([0, 1, 2, 6], registers);
+        assert_eq!([0, 1, 2, 6, 0, 0], registers);
 
         evaluate_instruction(&mut registers, Opcode::Addr, &[2, 2, 1]);
-        assert_eq!([0, 4, 2, 6], registers);
+        assert_eq!([0, 4, 2, 6, 0, 0], registers);
     }
 
     #[test]
     fn mulr() {
-        let mut registers = [0, 1, 2, 0];
+        let mut registers = [0, 1, 2, 0, 0, 0];
         evaluate_instruction(&mut registers, Opcode::Mulr, &[1, 2, 3]);
-        assert_eq!([0, 1, 2, 2], registers);
+        assert_eq!([0, 1, 2, 2, 0, 0], registers);
 
         evaluate_instruction(&mut registers, Opcode::Mulr, &[0, 3, 1]);
-        assert_eq!([0, 0, 2, 2], registers);
+        assert_eq!([0, 0, 2, 2, 0, 0], registers);
     }
 
     #[test]
     fn muli() {
-        let mut registers = [0, 1, 2, 10];
+        let mut registers = [0, 1, 2, 10, 0, 0];
         evaluate_instruction(&mut registers, Opcode::Muli, &[1, 2, 1]);
-        assert_eq!([0, 2, 2, 10], registers);
+        assert_eq!([0, 2, 2, 10, 0, 0], registers);
 
         evaluate_instruction(&mut registers, Opcode::Muli, &[1, 10, 0]);
-        assert_eq!([20, 2, 2, 10], registers);
+        assert_eq!([20, 2, 2, 10, 0, 0], registers);
     }
 
     #[test]
     fn banr() {
-        let mut registers = [0, 1, 3, 0];
+        let mut registers = [0, 1, 3, 0, 0, 0];
         evaluate_instruction(&mut registers, Opcode::Banr, &[1, 2, 3]);
-        assert_eq!([0, 1, 3, 1], registers);
+        assert_eq!([0, 1, 3, 1, 0, 0], registers);
     }
 
     #[test]
     fn bani() {
-        let mut registers = [0, 1, 0, 0];
+        let mut registers = [0, 1, 0, 0, 0, 0];
         evaluate_instruction(&mut registers, Opcode::Bani, &[1, 3, 2]);
-        assert_eq!([0, 1, 1, 0], registers);
+        assert_eq!([0, 1, 1, 0, 0, 0], registers);
     }
 
     #[test]
     fn borr() {
-        let mut registers = [0, 1, 2, 0];
+        let mut registers = [0, 1, 2, 0, 0, 0];
         evaluate_instruction(&mut registers, Opcode::Borr, &[1, 2, 3]);
-        assert_eq!([0, 1, 2, 3], registers);
+        assert_eq!([0, 1, 2, 3, 0, 0], registers);
     }
 
     #[test]
     fn bori() {
-        let mut registers = [0, 2, 0, 0];
+        let mut registers = [0, 2, 0, 0, 0, 0];
         evaluate_instruction(&mut registers, Opcode::Bori, &[1, 4, 3]);
-        assert_eq!([0, 2, 0, 6], registers);
+        assert_eq!([0, 2, 0, 6, 0, 0], registers);
     }
 
     #[test]
     fn setr() {
-        let mut registers = [0, 2, 0, 0];
+        let mut registers = [0, 2, 0, 0, 0, 0];
         evaluate_instruction(&mut registers, Opcode::Setr, &[1, 2, 0]);
-        assert_eq!([2, 2, 0, 0], registers);
+        assert_eq!([2, 2, 0, 0, 0, 0], registers);
     }
 
     #[test]
     fn seti() {
-        let mut registers = [0, 2, 0, 0];
+        let mut registers = [0, 2, 0, 0, 0, 0];
         evaluate_instruction(&mut registers, Opcode::Seti, &[42, 2, 0]);
-        assert_eq!([42, 2, 0, 0], registers);
+        assert_eq!([42, 2, 0, 0, 0, 0], registers);
     }
 
     #[test]
     fn gtir() {
-        let mut registers = [0, 2, 0, 0];
+        let mut registers = [0, 2, 0, 0, 0, 0];
         evaluate_instruction(&mut registers, Opcode::Gtir, &[5, 1, 3]);
-        assert_eq!([0, 2, 0, 1], registers);
+        assert_eq!([0, 2, 0, 1, 0, 0], registers);
 
         evaluate_instruction(&mut registers, Opcode::Gtir, &[1, 1, 3]);
-        assert_eq!([0, 2, 0, 0], registers);
+        assert_eq!([0, 2, 0, 0, 0, 0], registers);
     }
 
     #[test]
     fn gtri() {
-        let mut registers = [0, 2, 0, 0];
+        let mut registers = [0, 2, 0, 0, 0, 0];
         evaluate_instruction(&mut registers, Opcode::Gtri, &[1, 1, 3]);
-        assert_eq!([0, 2, 0, 1], registers);
+        assert_eq!([0, 2, 0, 1, 0, 0], registers);
 
         evaluate_instruction(&mut registers, Opcode::Gtri, &[1, 3, 3]);
-        assert_eq!([0, 2, 0, 0], registers);
+        assert_eq!([0, 2, 0, 0, 0, 0], registers);
     }
 
     #[test]
     fn gtrr() {
-        let mut registers = [0, 2, 1, 0];
+        let mut registers = [0, 2, 1, 0, 0, 0];
         evaluate_instruction(&mut registers, Opcode::Gtrr, &[1, 2, 3]);
-        assert_eq!([0, 2, 1, 1], registers);
+        assert_eq!([0, 2, 1, 1, 0, 0], registers);
 
         evaluate_instruction(&mut registers, Opcode::Gtrr, &[2, 1, 3]);
-        assert_eq!([0, 2, 1, 0], registers);
+        assert_eq!([0, 2, 1, 0, 0, 0], registers);
     }
 
     #[test]
     fn eqir() {
-        let mut registers = [0, 0, 1, 0];
+        let mut registers = [0, 0, 1, 0, 0, 0];
         evaluate_instruction(&mut registers, Opcode::Eqir, &[1, 2, 3]);
-        assert_eq!([0, 0, 1, 1], registers);
+        assert_eq!([0, 0, 1, 1, 0, 0], registers);
 
         evaluate_instruction(&mut registers, Opcode::Eqir, &[0, 2, 3]);
-        assert_eq!([0, 0, 1, 0], registers);
+        assert_eq!([0, 0, 1, 0, 0, 0], registers);
     }
 
     #[test]
     fn eqri() {
-        let mut registers = [0, 5, 1, 0];
+        let mut registers = [0, 5, 1, 0, 0, 0];
         evaluate_instruction(&mut registers, Opcode::Eqri, &[1, 5, 3]);
-        assert_eq!([0, 5, 1, 1], registers);
+        assert_eq!([0, 5, 1, 1, 0, 0], registers);
 
         evaluate_instruction(&mut registers, Opcode::Eqri, &[1, 4, 3]);
-        assert_eq!([0, 5, 1, 0], registers);
+        assert_eq!([0, 5, 1, 0, 0, 0], registers);
     }
 
     #[test]
     fn eqrr() {
-        let mut registers = [0, 5, 5, 0];
+        let mut registers = [0, 5, 5, 0, 0, 0];
         evaluate_instruction(&mut registers, Opcode::Eqrr, &[1, 2, 3]);
-        assert_eq!([0, 5, 5, 1], registers);
+        assert_eq!([0, 5, 5, 1, 0, 0], registers);
 
         evaluate_instruction(&mut registers, Opcode::Eqrr, &[0, 1, 3]);
-        assert_eq!([0, 5, 5, 0], registers);
+        assert_eq!([0, 5, 5, 0, 0, 0], registers);
     }
 }
