@@ -2,7 +2,6 @@ extern crate util;
 
 use std::collections::{HashMap, VecDeque};
 use std::env;
-use std::str::Chars;
 
 use util::input::{FileReader, FromFile};
 
@@ -25,6 +24,7 @@ fn main() {
 
     let mut graph = Graph::new();
     graph.build(&input);
+
     let (farthest_node, farthest_dist) = graph.find_farthest_node(Position::new(0, 0));
     let distance_at_least_1000 = graph.find_nodes_farther_than(Position::new(0, 0), 1000);
 
@@ -77,6 +77,55 @@ impl Position {
 }
 
 #[derive(Debug)]
+struct Item<'a> {
+    chars: &'a [u8],
+    cursor: usize,
+    position: Position,
+}
+
+impl<'a> Item<'a> {
+    fn copy_from(item: &Item<'a>) -> Item<'a> {
+        Item { ..*item }
+    }
+
+    #[allow(dead_code)]
+    fn print(&self) {
+        for ch in self.chars {
+            print!("{}", *ch as char);
+        }
+        println!();
+        for _ in 0..self.cursor {
+            print!(" ");
+        }
+        println!("^");
+    }
+}
+
+impl<'a> Eq for Item<'a> {}
+
+impl<'a> PartialEq for Item<'a> {
+    fn eq(&self, other: &Item) -> bool {
+        self.cursor == other.cursor && self.position == other.position
+    }
+}
+
+impl<'a> Ord for Item<'a> {
+    fn cmp(&self, other: &Item) -> std::cmp::Ordering {
+        if self.cursor == other.cursor {
+            self.position.cmp(&other.position)
+        } else {
+            self.cursor.cmp(&other.cursor)
+        }
+    }
+}
+
+impl<'a> PartialOrd for Item<'a> {
+    fn partial_cmp(&self, other: &Item) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+#[derive(Debug)]
 struct Graph {
     edges: HashMap<Position, Vec<Position>>,
 }
@@ -93,8 +142,7 @@ impl Graph {
             panic!("invalid input, missing start/end token");
         }
 
-        let input = &input[1..];
-        self.parse(Position::new(0, 0), &mut input.chars(), 0);
+        self.parse(Position::new(0, 0), input[1..].as_bytes());
     }
 
     fn find_farthest_node(&self, from: Position) -> (Position, usize) {
@@ -166,96 +214,115 @@ impl Graph {
         distances
     }
 
-    // TODO: I don't think this solution is correct for all inputs, e.g ^EEE(N(N|)W|)S$
-    fn parse(&mut self, current: Position, mut chars: &mut Chars, level: usize) -> Vec<Position> {
-        let start_pos = current;
-        let mut current = current;
-        let mut positions = Vec::new();
-        let wrong = true;
+    fn parse(&mut self, start_position: Position, chars: &[u8]) {
+        let mut items = vec![Item {
+            chars,
+            cursor: 0,
+            position: start_position,
+        }];
 
         loop {
-            if let Some(c) = chars.next() {
-                //println!("Parse [{}]: {}", level, c);
-                match c {
-                    'N' => {
-                        self.add_edge(current, current.north());
-                        current = current.north();
-                    }
-                    'E' => {
-                        self.add_edge(current, current.east());
-                        current = current.east();
-                    }
-                    'S' => {
-                        self.add_edge(current, current.south());
-                        current = current.south();
-                    }
-                    'W' => {
-                        self.add_edge(current, current.west());
-                        current = current.west();
-                    }
-                    '$' => {
-                        positions.push(current);
-                        break;
-                    }
-                    '(' => {
-                        let mut returned_positions = self.parse(current, &mut chars, level + 1);
-                        if wrong /* solution (part 1) becomes correct if we always takes this branch :-/ */ || returned_positions.len() == 1
-                        {
-                            //println!("[{}] Got 1 position back", level);
-                            current = returned_positions[0];
-                        } else {
-                            /*println!(
-                                "[{}] Got {} positions back",
-                                level,
-                                returned_positions.len()
-                            );*/
-
-                            let mut peek = chars.clone();
-                            if let Some(c) = peek.next() {
-                                if c == '|' {
-                                    positions.append(&mut returned_positions);
-                                    current = start_pos;
-                                } else if c == ')' {
-                                    positions.append(&mut returned_positions);
-                                    break;
-                                } else {
-                                    let chars_clone = chars.clone();
-                                    for (i, &pos) in returned_positions.iter().enumerate() {
-                                        let mut result = if i == 0 {
-                                            // Give original iterator (we need the cursor to be updated) to first
-                                            self.parse(pos, &mut chars, level + 1)
-                                        } else {
-                                            // Give cloned iterator to all the others
-                                            self.parse(pos, &mut chars_clone.clone(), level + 1)
-                                        };
-
-                                        positions.append(&mut result);
-                                    }
-                                    current = positions[0];
-                                }
-                            }
-                        }
-                    }
-                    ')' => {
-                        positions.push(current);
-                        break;
-                    }
-                    '|' => {
-                        positions.push(current);
-                        current = start_pos;
-                    }
-                    c => panic!("invalid token {}", c),
-                }
-            } else {
-                //println!("[{}] No more characters", level);
-                positions.push(current);
+            if items.is_empty() {
                 break;
             }
+
+            let current_item = items.remove(0);
+            let mut new_items = self.process(current_item);
+            items.append(&mut new_items);
+
+            items.sort_unstable();
+            items.dedup();
+        }
+    }
+
+    fn process<'a>(&mut self, item: Item<'a>) -> Vec<Item<'a>> {
+        let mut items = Vec::new();
+
+        let c = item.chars[item.cursor];
+        match c {
+            b'N' => {
+                self.add_edge(item.position, item.position.north());
+                let mut new_item = Item::copy_from(&item);
+                new_item.cursor += 1;
+                new_item.position = item.position.north();
+                items.push(new_item);
+            }
+            b'E' => {
+                self.add_edge(item.position, item.position.east());
+                let mut new_item = Item::copy_from(&item);
+                new_item.cursor += 1;
+                new_item.position = item.position.east();
+                items.push(new_item);
+            }
+            b'S' => {
+                self.add_edge(item.position, item.position.south());
+                let mut new_item = Item::copy_from(&item);
+                new_item.cursor += 1;
+                new_item.position = item.position.south();
+                items.push(new_item);
+            }
+            b'W' => {
+                self.add_edge(item.position, item.position.west());
+                let mut new_item = Item::copy_from(&item);
+                new_item.cursor += 1;
+                new_item.position = item.position.west();
+                items.push(new_item);
+            }
+            b'(' => {
+                let mut new_item = Item::copy_from(&item);
+                new_item.cursor += 1;
+                items.push(new_item);
+
+                let mut parens = 1;
+                for i in item.cursor + 1..item.chars.len() {
+                    match item.chars[i] {
+                        b'(' => parens += 1,
+                        b')' => {
+                            parens -= 1;
+                            if parens == 0 {
+                                break;
+                            }
+                        }
+                        b'|' if parens == 1 => {
+                            let mut new_item = Item::copy_from(&item);
+                            new_item.cursor = i + 1;
+                            items.push(new_item);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            b'|' => {
+                let mut parens = 1;
+                for i in item.cursor + 1..item.chars.len() {
+                    match item.chars[i] {
+                        b'(' => parens += 1,
+                        b')' => {
+                            parens -= 1;
+                            if parens == 0 {
+                                let mut new_item = Item::copy_from(&item);
+                                new_item.cursor = i + 1;
+                                items.push(new_item);
+                                break;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                assert_eq!(0, parens);
+            }
+            b')' => {
+                let mut new_item = Item::copy_from(&item);
+                new_item.cursor += 1;
+                items.push(new_item);
+            }
+            b'$' => {
+                // nothing to do (item will be consumed, but not generate any new ones)
+            }
+            c => panic!("invalid token {}", c),
         }
 
-        positions.sort();
-        positions.dedup();
-        positions
+        items
     }
 
     fn add_edge(&mut self, from: Position, to: Position) {
