@@ -23,15 +23,13 @@ fn main() {
         }
     };
 
-    // TODO: handle this case:
-    //let input = "^NNNNN(NNNN|EEEE)NNNN$".to_string();
     let mut graph = Graph::new();
     graph.build(&input);
 
     println!("{}", graph);
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct Position {
     x: isize,
     y: isize,
@@ -89,45 +87,97 @@ impl Graph {
         }
 
         let input = &input[1..];
-        self.parse(Position::new(0, 0), &mut input.chars());
+        self.parse(Position::new(0, 0), &mut input.chars(), 0);
     }
 
-    fn parse(&mut self, current: Position, mut chars: &mut Chars) -> Vec<Position> {
+    fn parse(&mut self, current: Position, mut chars: &mut Chars, level: usize) -> Vec<Position> {
         let start_pos = current;
         let mut current = current;
+        let mut positions = Vec::new();
 
         loop {
-            let c = chars.next().unwrap();
-            match c {
-                'N' => {
-                    self.add_edge(current, current.north());
-                    current = current.north();
+            if let Some(c) = chars.next() {
+                println!("Parse [{}]: {}", level, c);
+                match c {
+                    'N' => {
+                        self.add_edge(current, current.north());
+                        current = current.north();
+                    }
+                    'E' => {
+                        self.add_edge(current, current.east());
+                        current = current.east();
+                    }
+                    'S' => {
+                        self.add_edge(current, current.south());
+                        current = current.south();
+                    }
+                    'W' => {
+                        self.add_edge(current, current.west());
+                        current = current.west();
+                    }
+                    '$' => {
+                        positions.push(current);
+                        break;
+                    }
+                    '(' => {
+                        let mut returned_positions = self.parse(current, &mut chars, level + 1);
+                        if returned_positions.len() == 1 {
+                            println!("[{}] Got 1 position back", level);
+                            current = returned_positions[0];
+                        } else {
+                            println!(
+                                "[{}] Got {} positions back",
+                                level,
+                                returned_positions.len()
+                            );
+
+                            let mut peek = chars.clone();
+                            if let Some(c) = peek.next() {
+                                println!("Next: {}", c);
+                                if c == '|' {
+                                    positions.append(&mut returned_positions);
+                                    current = start_pos;
+                                } else if c == ')' {
+                                    positions.append(&mut returned_positions);
+                                    break;
+                                } else {
+                                    let chars_clone = chars.clone();
+                                    for (i, &pos) in returned_positions.iter().enumerate() {
+                                        let mut result = if i == 0 {
+                                            // Give original iterator (we need the cursor to be updated) to first
+                                            self.parse(pos, &mut chars, level + 1)
+                                        } else {
+                                            // Give cloned iterator to all the others
+                                            self.parse(pos, &mut chars_clone.clone(), level + 1)
+                                        };
+
+                                        positions.append(&mut result);
+                                    }
+                                    current = positions[0];
+                                }
+                            }
+                        }
+                    }
+                    ')' => {
+                        positions.push(current);
+                        break;
+                    }
+                    '|' => {
+                        positions.push(current);
+                        current = start_pos;
+                    }
+                    c => panic!("invalid token {}", c),
                 }
-                'E' => {
-                    self.add_edge(current, current.east());
-                    current = current.east();
-                }
-                'S' => {
-                    self.add_edge(current, current.south());
-                    current = current.south();
-                }
-                'W' => {
-                    self.add_edge(current, current.west());
-                    current = current.west();
-                }
-                '$' => break,
-                '(' => {
-                    self.parse(current, &mut chars);
-                }
-                ')' => break,
-                '|' => {
-                    current = start_pos;
-                }
-                c => panic!("invalid token {}", c),
+            } else {
+                println!("[{}] No more characters", level);
+                positions.push(current);
+                break;
             }
         }
 
-        Vec::new()
+        positions.sort();
+        positions.dedup();
+        positions
     }
 
     fn add_edge(&mut self, from: Position, to: Position) {
