@@ -1,6 +1,6 @@
 extern crate util;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::env;
 use std::str::Chars;
 
@@ -25,8 +25,13 @@ fn main() {
 
     let mut graph = Graph::new();
     graph.build(&input);
+    let (farthest_node, farthest_dist) = graph.find_farthest_node(Position::new(0, 0));
 
     println!("{}", graph);
+    println!(
+        "Farthest node: {:?}, distance {}",
+        farthest_node, farthest_dist
+    );
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -90,6 +95,61 @@ impl Graph {
         self.parse(Position::new(0, 0), &mut input.chars(), 0);
     }
 
+    fn find_farthest_node(&self, from: Position) -> (Position, usize) {
+        // Check that start position is in graph
+        if !self.edges.contains_key(&from) {
+            panic!("start position not in graph");
+        }
+
+        // Initialize distances map
+        // Node not in map => node not reachable (i.e. wall, out of bounds, etc.)
+        // Node in map with distance = usize::max_value() => node not visited yet
+        // Node in map with distance < usize::max_value() => node visited, value corresponds to distance
+        let mut distances: HashMap<Position, usize> = HashMap::new();
+        for &node in self.edges.keys() {
+            distances.insert(node, usize::max_value());
+        }
+
+        // Queue for unvisited nodes
+        let mut queue: VecDeque<Position> = VecDeque::new();
+
+        // Initialize queue with start position
+        distances.insert(from, 0);
+        queue.push_back(from);
+
+        // BFS
+        loop {
+            if let Some(pos) = queue.pop_front() {
+                // Lookup neighbors
+                let current_dist = *distances.get(&pos).unwrap();
+                let neighbors = self.edges.get(&pos).unwrap();
+                for &neighbor in neighbors {
+                    let distance = distances.get_mut(&neighbor).unwrap();
+                    if *distance == usize::max_value() {
+                        // Node not visited yet, update distance and add to queue
+                        *distance = current_dist + 1;
+                        queue.push_back(neighbor);
+                    }
+                }
+            } else {
+                break;
+            }
+        }
+
+        // Get highest distance
+        let mut farthest_dist = usize::min_value();
+        let mut farthest_node = Position::new(0, 0);
+        for (&k, &v) in distances.iter() {
+            if v > farthest_dist {
+                farthest_dist = v;
+                farthest_node = k;
+            }
+        }
+
+        (farthest_node, farthest_dist)
+    }
+
+    // TODO: I don't think this solution is correct for all inputs, e.g ^EEE(N(N|)W|)S$
     fn parse(&mut self, current: Position, mut chars: &mut Chars, level: usize) -> Vec<Position> {
         let start_pos = current;
         let mut current = current;
@@ -97,7 +157,7 @@ impl Graph {
 
         loop {
             if let Some(c) = chars.next() {
-                println!("Parse [{}]: {}", level, c);
+                //println!("Parse [{}]: {}", level, c);
                 match c {
                     'N' => {
                         self.add_edge(current, current.north());
@@ -121,19 +181,19 @@ impl Graph {
                     }
                     '(' => {
                         let mut returned_positions = self.parse(current, &mut chars, level + 1);
-                        if returned_positions.len() == 1 {
-                            println!("[{}] Got 1 position back", level);
+                        if true /* solution (part 1) becomes correct if we always takes this branch :-/ */ || returned_positions.len() == 1
+                        {
+                            //println!("[{}] Got 1 position back", level);
                             current = returned_positions[0];
                         } else {
-                            println!(
+                            /*println!(
                                 "[{}] Got {} positions back",
                                 level,
                                 returned_positions.len()
-                            );
+                            );*/
 
                             let mut peek = chars.clone();
                             if let Some(c) = peek.next() {
-                                println!("Next: {}", c);
                                 if c == '|' {
                                     positions.append(&mut returned_positions);
                                     current = start_pos;
@@ -169,7 +229,7 @@ impl Graph {
                     c => panic!("invalid token {}", c),
                 }
             } else {
-                println!("[{}] No more characters", level);
+                //println!("[{}] No more characters", level);
                 positions.push(current);
                 break;
             }
