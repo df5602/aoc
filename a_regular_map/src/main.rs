@@ -26,12 +26,14 @@ fn main() {
     let mut graph = Graph::new();
     graph.build(&input);
     let (farthest_node, farthest_dist) = graph.find_farthest_node(Position::new(0, 0));
+    let distance_at_least_1000 = graph.find_nodes_farther_than(Position::new(0, 0), 1000);
 
     println!("{}", graph);
     println!(
         "Farthest node: {:?}, distance {}",
         farthest_node, farthest_dist
     );
+    println!("Nodes farther than 1000: {}", distance_at_least_1000.len());
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -96,6 +98,35 @@ impl Graph {
     }
 
     fn find_farthest_node(&self, from: Position) -> (Position, usize) {
+        let distances = self.calculate_distances(from);
+
+        // Get highest distance
+        let mut farthest_dist = usize::min_value();
+        let mut farthest_node = Position::new(0, 0);
+        for (&k, &v) in distances.iter() {
+            if v > farthest_dist {
+                farthest_dist = v;
+                farthest_node = k;
+            }
+        }
+
+        (farthest_node, farthest_dist)
+    }
+
+    fn find_nodes_farther_than(&self, from: Position, threshold: usize) -> Vec<(Position, usize)> {
+        let distances = self.calculate_distances(from);
+
+        let mut nodes = Vec::new();
+        for (&k, &v) in distances.iter() {
+            if v >= threshold {
+                nodes.push((k, v));
+            }
+        }
+
+        nodes
+    }
+
+    fn calculate_distances(&self, from: Position) -> HashMap<Position, usize> {
         // Check that start position is in graph
         if !self.edges.contains_key(&from) {
             panic!("start position not in graph");
@@ -118,35 +149,21 @@ impl Graph {
         queue.push_back(from);
 
         // BFS
-        loop {
-            if let Some(pos) = queue.pop_front() {
-                // Lookup neighbors
-                let current_dist = *distances.get(&pos).unwrap();
-                let neighbors = self.edges.get(&pos).unwrap();
-                for &neighbor in neighbors {
-                    let distance = distances.get_mut(&neighbor).unwrap();
-                    if *distance == usize::max_value() {
-                        // Node not visited yet, update distance and add to queue
-                        *distance = current_dist + 1;
-                        queue.push_back(neighbor);
-                    }
+        while let Some(pos) = queue.pop_front() {
+            // Lookup neighbors
+            let current_dist = distances[&pos];
+            let neighbors = &self.edges[&pos];
+            for &neighbor in neighbors {
+                let distance = distances.get_mut(&neighbor).unwrap();
+                if *distance == usize::max_value() {
+                    // Node not visited yet, update distance and add to queue
+                    *distance = current_dist + 1;
+                    queue.push_back(neighbor);
                 }
-            } else {
-                break;
             }
         }
 
-        // Get highest distance
-        let mut farthest_dist = usize::min_value();
-        let mut farthest_node = Position::new(0, 0);
-        for (&k, &v) in distances.iter() {
-            if v > farthest_dist {
-                farthest_dist = v;
-                farthest_node = k;
-            }
-        }
-
-        (farthest_node, farthest_dist)
+        distances
     }
 
     // TODO: I don't think this solution is correct for all inputs, e.g ^EEE(N(N|)W|)S$
@@ -154,6 +171,7 @@ impl Graph {
         let start_pos = current;
         let mut current = current;
         let mut positions = Vec::new();
+        let wrong = true;
 
         loop {
             if let Some(c) = chars.next() {
@@ -181,7 +199,7 @@ impl Graph {
                     }
                     '(' => {
                         let mut returned_positions = self.parse(current, &mut chars, level + 1);
-                        if true /* solution (part 1) becomes correct if we always takes this branch :-/ */ || returned_positions.len() == 1
+                        if wrong /* solution (part 1) becomes correct if we always takes this branch :-/ */ || returned_positions.len() == 1
                         {
                             //println!("[{}] Got 1 position back", level);
                             current = returned_positions[0];
