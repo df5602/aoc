@@ -125,6 +125,49 @@ impl<'a> PartialOrd for Item<'a> {
     }
 }
 
+struct SortedQueueSet<'a> {
+    queue: VecDeque<Item<'a>>,
+}
+
+impl<'a> SortedQueueSet<'a> {
+    fn new() -> Self {
+        Self {
+            queue: VecDeque::new(),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.queue.is_empty()
+    }
+
+    #[allow(dead_code)]
+    fn len(&self) -> usize {
+        self.queue.len()
+    }
+
+    fn pop_front(&mut self) -> Option<Item<'a>> {
+        self.queue.pop_front()
+    }
+
+    fn insert(&mut self, item: Item<'a>) {
+        if self.is_empty() || *self.queue.back().unwrap() < item {
+            self.queue.push_back(item);
+        } else {
+            for i in 0..self.queue.len() {
+                let curr = &self.queue[i];
+                if *curr >= item {
+                    if *curr == item {
+                        break;
+                    } else {
+                        self.queue.insert(i, item);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[derive(Debug)]
 struct Graph {
     edges: HashMap<Position, Vec<Position>>,
@@ -215,23 +258,23 @@ impl Graph {
     }
 
     fn parse(&mut self, start_position: Position, chars: &[u8]) {
-        let mut items = vec![Item {
+        let mut items = SortedQueueSet::new();
+        items.insert(Item {
             chars,
             cursor: 0,
             position: start_position,
-        }];
+        });
 
         loop {
             if items.is_empty() {
                 break;
             }
 
-            let current_item = items.remove(0);
-            let mut new_items = self.process(current_item);
-            items.append(&mut new_items);
-
-            items.sort_unstable();
-            items.dedup();
+            let current_item = items.pop_front().unwrap();
+            let new_items = self.process(current_item);
+            for item in new_items {
+                items.insert(item);
+            }
         }
     }
 
