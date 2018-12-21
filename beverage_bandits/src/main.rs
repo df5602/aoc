@@ -32,10 +32,7 @@ fn main() {
         }
         println!("After round {}", combat.completed_rounds);
         println!("{}", combat);
-        let units = combat.grid.all_units();
-        for unit in units {
-            println!("{:?}", unit);
-        }
+
         //let mut input_buffer = String::new();
         //let _ = std::io::stdin().lock().read_line(&mut input_buffer);
     }
@@ -71,15 +68,14 @@ impl Combat {
 
     fn fight_round(&mut self) -> CombatState {
         let combat_order = self.combat_order();
-        let mut dead_units = Vec::new();
 
         for unit in combat_order {
-            let mut unit = unit;
-
-            // Is unit still alive?
-            if dead_units.contains(&unit) {
+            let mut unit = if let Some(unit) = self.grid.get_unit_by_id(unit.id) {
+                unit
+            } else {
+                // Unit is already dead...
                 continue;
-            }
+            };
 
             let targets = self.grid.get_targets(&unit);
 
@@ -125,9 +121,7 @@ impl Combat {
 
             // Attack, if possible
             if let Some(victim) = self.select_victim(&unit) {
-                if self.grid.attack(&unit, &victim) {
-                    dead_units.push(victim);
-                }
+                self.grid.attack(&unit, &victim);
             }
         }
 
@@ -274,6 +268,7 @@ enum UnitType {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 struct Unit {
+    id: usize,
     kind: UnitType,
     position: GridPosition,
     hit_points: isize,
@@ -281,8 +276,16 @@ struct Unit {
 }
 
 impl Unit {
-    fn new(kind: UnitType, x: usize, y: usize, hit_points: isize, attack_power: usize) -> Self {
+    fn new(
+        id: usize,
+        kind: UnitType,
+        x: usize,
+        y: usize,
+        hit_points: isize,
+        attack_power: usize,
+    ) -> Self {
         Self {
+            id,
             kind,
             position: GridPosition { x, y },
             hit_points,
@@ -418,12 +421,20 @@ impl Grid {
         let mut grid = Vec::with_capacity(width * height);
         let mut x = 0;
         let mut y = 0;
+        let mut unit_id = 0;
+
         input.iter().flat_map(|s| s.chars()).for_each(|c| {
             let cell = match c {
                 '.' => Cell::Open,
                 '#' => Cell::Wall,
-                'E' => Cell::Unit(Unit::new(UnitType::Elf, x, y, 200, 3)),
-                'G' => Cell::Unit(Unit::new(UnitType::Goblin, x, y, 200, 3)),
+                'E' => {
+                    unit_id += 1;
+                    Cell::Unit(Unit::new(unit_id - 1, UnitType::Elf, x, y, 200, 3))
+                }
+                'G' => {
+                    unit_id += 1;
+                    Cell::Unit(Unit::new(unit_id - 1, UnitType::Goblin, x, y, 200, 3))
+                }
                 _ => panic!("unexpected input!"),
             };
             grid.push(cell);
@@ -456,6 +467,7 @@ impl Grid {
 
         if let Cell::Open = self.grid[position.y * self.width + position.x] {
             self.grid[position.y * self.width + position.x] = Cell::Unit(Unit::new(
+                unit.id,
                 unit.kind,
                 position.x,
                 position.y,
@@ -475,6 +487,7 @@ impl Grid {
             true
         } else {
             self.grid[victim.position.y * self.width + victim.position.x] = Cell::Unit(Unit::new(
+                victim.id,
                 victim.kind,
                 victim.position.x,
                 victim.position.y,
@@ -493,6 +506,17 @@ impl Grid {
                 _ => None,
             })
             .collect()
+    }
+
+    fn get_unit_by_id(&self, id: usize) -> Option<Unit> {
+        self.grid
+            .iter()
+            .filter_map(|cell| match cell {
+                Cell::Unit(unit) => Some(*unit),
+                _ => None,
+            })
+            .filter(|unit| unit.id == id)
+            .nth(0)
     }
 
     fn get_targets(&self, unit: &Unit) -> Vec<Target> {
@@ -547,10 +571,19 @@ impl Grid {
 
 impl std::fmt::Display for Grid {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, " 0: ")?;
+        let mut y = 0;
         for (i, c) in self.grid.iter().enumerate() {
             write!(f, "{}", c)?;
             if (i + 1) % self.width == 0 {
+                y += 1;
                 writeln!(f)?;
+                if y < self.height {
+                    if y < 10 {
+                        write!(f, " ")?;
+                    }
+                    write!(f, "{}: ", y)?;
+                }
             }
         }
         Ok(())
@@ -573,21 +606,33 @@ mod tests {
         let combat = Combat::create(&input);
         let mut order = combat.combat_order().into_iter();
         assert_eq!(
-            Some(Unit::new(UnitType::Goblin, 2, 1, 200, 3)),
+            Some(Unit::new(0, UnitType::Goblin, 2, 1, 200, 3)),
             order.next()
         );
-        assert_eq!(Some(Unit::new(UnitType::Elf, 4, 1, 200, 3)), order.next());
-        assert_eq!(Some(Unit::new(UnitType::Elf, 1, 2, 200, 3)), order.next());
         assert_eq!(
-            Some(Unit::new(UnitType::Goblin, 3, 2, 200, 3)),
+            Some(Unit::new(1, UnitType::Elf, 4, 1, 200, 3)),
             order.next()
         );
-        assert_eq!(Some(Unit::new(UnitType::Elf, 5, 2, 200, 3)), order.next());
         assert_eq!(
-            Some(Unit::new(UnitType::Goblin, 2, 3, 200, 3)),
+            Some(Unit::new(2, UnitType::Elf, 1, 2, 200, 3)),
             order.next()
         );
-        assert_eq!(Some(Unit::new(UnitType::Elf, 4, 3, 200, 3)), order.next());
+        assert_eq!(
+            Some(Unit::new(3, UnitType::Goblin, 3, 2, 200, 3)),
+            order.next()
+        );
+        assert_eq!(
+            Some(Unit::new(4, UnitType::Elf, 5, 2, 200, 3)),
+            order.next()
+        );
+        assert_eq!(
+            Some(Unit::new(5, UnitType::Goblin, 2, 3, 200, 3)),
+            order.next()
+        );
+        assert_eq!(
+            Some(Unit::new(6, UnitType::Elf, 4, 3, 200, 3)),
+            order.next()
+        );
         assert_eq!(None, order.next());
     }
 
