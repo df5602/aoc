@@ -21,4 +21,5 @@ members = [
     "settlers_of_the_north_pole",
     "go_with_the_flow",
     "a_regular_map",
+    "chronal_conversion",
 ]

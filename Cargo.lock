@@ -61,6 +61,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "chronal_conversion"
+version = "0.1.0"
+dependencies = [
+ "util 0.1.0",
+]
+
+[[package]]
 name = "chronal_coordinates"
 version = "0.1.0"
 dependencies = [
