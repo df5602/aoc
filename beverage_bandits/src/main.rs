@@ -23,28 +23,37 @@ fn main() {
         }
     };
 
-    let mut combat = Combat::create(&input);
-    println!("{}", combat);
-    loop {
-        let result = combat.fight_round();
-        if result == CombatState::Finished {
+    for power in 3.. {
+        let mut combat = Combat::create(&input, power);
+        println!("{}", combat);
+        loop {
+            let result = combat.fight_round();
+            if result == CombatState::Finished {
+                break;
+            }
+            println!("After round {}", combat.completed_rounds);
+            println!("{}", combat);
+
+            //let mut input_buffer = String::new();
+            //let _ = std::io::stdin().lock().read_line(&mut input_buffer);
+        }
+
+        let completed_round = combat.completed_rounds;
+        let killed_elves = combat.killed_elves;
+        let sum_of_hp = combat.calculate_sum_of_hit_points();
+        println!(
+            "Elf attack power: {}, Completed rounds: {}, Killed elves: {}, Sum of hit points: {} => {}",
+            power,
+            completed_round,
+            killed_elves,
+            sum_of_hp,
+            completed_round * sum_of_hp
+        );
+
+        if killed_elves == 0 {
             break;
         }
-        println!("After round {}", combat.completed_rounds);
-        println!("{}", combat);
-
-        //let mut input_buffer = String::new();
-        //let _ = std::io::stdin().lock().read_line(&mut input_buffer);
     }
-
-    let completed_round = combat.completed_rounds;
-    let sum_of_hp = combat.calculate_sum_of_hit_points();
-    println!(
-        "Completed rounds: {}, Sum of hit points: {} => {}",
-        completed_round,
-        sum_of_hp,
-        completed_round * sum_of_hp
-    );
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -56,13 +65,15 @@ enum CombatState {
 struct Combat {
     grid: Grid,
     completed_rounds: usize,
+    killed_elves: usize,
 }
 
 impl Combat {
-    fn create(input: &[String]) -> Self {
+    fn create(input: &[String], attack_power_elves: usize) -> Self {
         Self {
-            grid: Grid::create(&input),
+            grid: Grid::create(&input, attack_power_elves),
             completed_rounds: 0,
+            killed_elves: 0,
         }
     }
 
@@ -121,7 +132,12 @@ impl Combat {
 
             // Attack, if possible
             if let Some(victim) = self.select_victim(&unit) {
-                self.grid.attack(&unit, &victim);
+                if self.grid.attack(&unit, &victim) {
+                    // Unit was killed, was it an elf?
+                    if victim.is_elf() {
+                        self.killed_elves += 1;
+                    }
+                }
             }
         }
 
@@ -411,7 +427,7 @@ struct Grid {
 }
 
 impl Grid {
-    fn create(input: &[String]) -> Self {
+    fn create(input: &[String], attack_power_elves: usize) -> Self {
         let (width, height) = if !input.is_empty() {
             (input[0].len(), input.len())
         } else {
@@ -429,7 +445,14 @@ impl Grid {
                 '#' => Cell::Wall,
                 'E' => {
                     unit_id += 1;
-                    Cell::Unit(Unit::new(unit_id - 1, UnitType::Elf, x, y, 200, 3))
+                    Cell::Unit(Unit::new(
+                        unit_id - 1,
+                        UnitType::Elf,
+                        x,
+                        y,
+                        200,
+                        attack_power_elves,
+                    ))
                 }
                 'G' => {
                     unit_id += 1;
@@ -603,7 +626,7 @@ mod tests {
             "#.G.E.#".to_string(),
             "#######".to_string(),
         ];
-        let combat = Combat::create(&input);
+        let combat = Combat::create(&input, 3);
         let mut order = combat.combat_order().into_iter();
         assert_eq!(
             Some(Unit::new(0, UnitType::Goblin, 2, 1, 200, 3)),
@@ -652,7 +675,7 @@ mod tests {
             "#.G.#G#".to_string(),
             "#######".to_string(),
         ];
-        let combat = Combat::create(&input);
+        let combat = Combat::create(&input, 3);
         let shortest_paths = find_shortest_paths(
             &combat.grid,
             GridPosition { x: 1, y: 1 },
