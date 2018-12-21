@@ -1,5 +1,6 @@
 extern crate util;
 
+use std::collections::HashMap;
 use std::env;
 
 use util::input::{FileReader, FromFile};
@@ -24,8 +25,16 @@ fn main() {
     // TODO: only necessary because FileReader trims by default...
     let input: Vec<String> = input.lines().map(|s| s.parse().unwrap()).collect();
 
-    let grid = Grid::create(&input);
+    let mut grid = Grid::create(&input);
     println!("{}", grid);
+
+    loop {
+        let collision = grid.move_carts();
+        println!("{}", grid);
+        if collision {
+            break;
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -37,11 +46,19 @@ enum Direction {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
+enum Turn {
+    Left,
+    Straight,
+    Right,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
 struct Cart {
     id: usize,
     x: usize,
     y: usize,
     direction: Direction,
+    last_turn: Turn,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -54,7 +71,6 @@ enum Cell {
     Intersection,
     Cart(Cart),
     Collision(Cart, Cart),
-    OutOfBounds,
 }
 
 impl std::fmt::Display for Cell {
@@ -73,7 +89,6 @@ impl std::fmt::Display for Cell {
                 Direction::Right => write!(f, ">"),
             },
             Cell::Collision(_, _) => write!(f, "x"),
-            Cell::OutOfBounds => write!(f, "@"),
         }
     }
 }
@@ -82,6 +97,7 @@ struct Grid {
     width: usize,
     height: usize,
     grid: Vec<Cell>,
+    shadowed_cells: HashMap<(usize, usize), Cell>,
     carts: Vec<Cart>,
 }
 
@@ -98,6 +114,7 @@ impl Grid {
         let mut y = 0;
 
         let mut grid = Vec::with_capacity(width * height);
+        let mut shadowed_cells = HashMap::new();
         let mut carts = Vec::new();
 
         input.iter().flat_map(|s| s.chars()).for_each(|c| {
@@ -115,7 +132,9 @@ impl Grid {
                         x,
                         y,
                         direction: Direction::Up,
+                        last_turn: Turn::Right,
                     };
+                    shadowed_cells.insert((x, y), Cell::VerticalTrack);
                     carts.push(cart);
                     Cell::Cart(cart)
                 }
@@ -126,7 +145,9 @@ impl Grid {
                         x,
                         y,
                         direction: Direction::Down,
+                        last_turn: Turn::Right,
                     };
+                    shadowed_cells.insert((x, y), Cell::VerticalTrack);
                     carts.push(cart);
                     Cell::Cart(cart)
                 }
@@ -137,7 +158,9 @@ impl Grid {
                         x,
                         y,
                         direction: Direction::Left,
+                        last_turn: Turn::Right,
                     };
+                    shadowed_cells.insert((x, y), Cell::HorizontalTrack);
                     carts.push(cart);
                     Cell::Cart(cart)
                 }
@@ -148,7 +171,9 @@ impl Grid {
                         x,
                         y,
                         direction: Direction::Right,
+                        last_turn: Turn::Right,
                     };
+                    shadowed_cells.insert((x, y), Cell::HorizontalTrack);
                     carts.push(cart);
                     Cell::Cart(cart)
                 }
@@ -167,15 +192,106 @@ impl Grid {
             width,
             height,
             grid,
+            shadowed_cells,
             carts,
+        }
+    }
+
+    fn move_carts(&mut self) -> bool {
+        // Take snapshot of current positions and sort
+        let mut carts = self.carts.clone();
+        carts.sort_unstable_by(|a, b| {
+            if a.y == b.y {
+                a.x.cmp(&b.x)
+            } else {
+                a.y.cmp(&b.y)
+            }
+        });
+
+        // Move all carts
+        for cart in carts {
+            if self.move_cart(cart) {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn move_cart(&mut self, cart: Cart) -> bool {
+        let next_track = self.next_track(cart);
+
+        let mut collision = false;
+
+        match (self.at(next_track.0, next_track.1), cart.direction) {
+            (Cell::VerticalTrack, Direction::Up) | (Cell::VerticalTrack, Direction::Down) => {
+                // Normal move up/down
+                let shadowed = self.retrieve_shadowed(cart.x, cart.y);
+                self.store_shadowed(next_track.0, next_track.1);
+                self.set_at(cart.x, cart.y, shadowed);
+                let stored_cart = self.retrieve_cart(cart);
+                stored_cart.x = next_track.0;
+                stored_cart.y = next_track.1;
+                let cart = *stored_cart;
+                self.set_at(cart.x, cart.y, Cell::Cart(cart));
+            }
+            (Cell::Cart(other_cart), _) => {
+                // Collision
+                let shadowed = self.retrieve_shadowed(cart.x, cart.y);
+                self.set_at(cart.x, cart.y, shadowed);
+                self.store_shadowed(next_track.0, next_track.1);
+                let stored_cart = self.retrieve_cart(cart);
+                stored_cart.x = next_track.0;
+                stored_cart.y = next_track.1;
+                let cart = *stored_cart;
+                self.set_at(cart.x, cart.y, Cell::Collision(cart, other_cart));
+                collision = true;
+            }
+            _ => panic!("illegal move"),
+        }
+
+        collision
+    }
+
+    fn next_track(&self, cart: Cart) -> (usize, usize) {
+        match cart.direction {
+            Direction::Up => (cart.x, cart.y - 1),
+            Direction::Down => (cart.x, cart.y + 1),
+            Direction::Left => (cart.x - 1, cart.y),
+            Direction::Right => (cart.x + 1, cart.y),
         }
     }
 
     fn at(&self, x: usize, y: usize) -> Cell {
         if x >= self.width || y >= self.height {
-            return Cell::OutOfBounds;
+            panic!("out of bounds");
         }
         self.grid[y * self.width + x]
+    }
+
+    fn set_at(&mut self, x: usize, y: usize, value: Cell) {
+        if x >= self.width || y >= self.height {
+            panic!("out of bounds");
+        }
+        self.grid[y * self.width + x] = value;
+    }
+
+    fn retrieve_shadowed(&mut self, x: usize, y: usize) -> Cell {
+        if x >= self.width || y >= self.height {
+            panic!("out of bounds");
+        }
+        self.shadowed_cells.remove(&(x, y)).unwrap()
+    }
+
+    fn store_shadowed(&mut self, x: usize, y: usize) {
+        if x >= self.width || y >= self.height {
+            panic!("out of bounds");
+        }
+        let to_shadow = self.at(x, y);
+        self.shadowed_cells.insert((x, y), to_shadow);
+    }
+
+    fn retrieve_cart(&mut self, cart: Cart) -> &mut Cart {
+        self.carts.iter_mut().find(|&&mut c| c == cart).unwrap()
     }
 }
 
