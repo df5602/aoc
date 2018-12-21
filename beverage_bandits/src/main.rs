@@ -1,8 +1,8 @@
 extern crate util;
 
-use std::env;
-//use std::io::BufRead;
 use std::collections::VecDeque;
+use std::env;
+use std::{thread, time};
 
 use util::input::{FileReader, FromFile};
 
@@ -23,19 +23,25 @@ fn main() {
         }
     };
 
+    let visualize = false;
+    let delay = time::Duration::from_millis(100);
+
     for power in 3.. {
         let mut combat = Combat::create(&input, power);
-        println!("{}", combat);
+        if visualize {
+            println!("{}", combat);
+            thread::sleep(delay);
+        }
         loop {
             let result = combat.fight_round();
             if result == CombatState::Finished {
                 break;
             }
-            println!("After round {}", combat.completed_rounds);
-            println!("{}", combat);
-
-            //let mut input_buffer = String::new();
-            //let _ = std::io::stdin().lock().read_line(&mut input_buffer);
+            if visualize {
+                println!("After round {}", combat.completed_rounds);
+                println!("{}", combat);
+                thread::sleep(delay);
+            }
         }
 
         let completed_round = combat.completed_rounds;
@@ -49,6 +55,9 @@ fn main() {
             sum_of_hp,
             completed_round * sum_of_hp
         );
+        if visualize {
+            thread::sleep(delay * 10);
+        }
 
         if killed_elves == 0 {
             break;
