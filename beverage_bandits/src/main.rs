@@ -2,6 +2,7 @@ extern crate util;
 
 use std::env;
 //use std::io::BufRead;
+use std::collections::VecDeque;
 
 use util::input::{FileReader, FromFile};
 
@@ -31,6 +32,10 @@ fn main() {
         }
         println!("After round {}", combat.completed_rounds);
         println!("{}", combat);
+        let units = combat.grid.all_units();
+        for unit in units {
+            println!("{:?}", unit);
+        }
         //let mut input_buffer = String::new();
         //let _ = std::io::stdin().lock().read_line(&mut input_buffer);
     }
@@ -104,7 +109,7 @@ impl Combat {
                     })
                     .collect();
                 let shortest_paths =
-                    find_shortest_paths(&self.grid, &unit.position, &move_candidates);
+                    find_shortest_paths(&self.grid, unit.position, &move_candidates);
 
                 // Move found?
                 if shortest_paths.is_empty()
@@ -188,143 +193,77 @@ struct ShortestPath {
 
 fn find_shortest_paths(
     grid: &Grid,
-    position: &GridPosition,
+    position: GridPosition,
     targets: &[GridPosition],
 ) -> Vec<ShortestPath> {
     let mut shortest_paths = Vec::new();
-    for target in targets {
-        // Initialize search grid
-        let mut search_grid: Vec<isize> = Vec::with_capacity(grid.width * grid.height);
-        for cell in grid.grid.iter() {
-            match cell {
-                Cell::Open => search_grid.push(0),
-                Cell::Unit(_) | Cell::Wall => search_grid.push(isize::max_value()),
+
+    // Initialize search grid
+    let mut search_grid: Vec<(usize, GridPosition)> = Vec::with_capacity(grid.width * grid.height);
+    for cell in grid.grid.iter() {
+        match cell {
+            Cell::Open => search_grid.push((0, GridPosition { x: 0, y: 0 })),
+            Cell::Unit(_) | Cell::Wall => {
+                search_grid.push((usize::max_value(), GridPosition { x: 0, y: 0 }))
             }
         }
+    }
 
-        // Make self position non-blocked
-        search_grid[position.y * grid.width + position.x] = 0;
+    // Priority queue of unvisited nodes
+    let mut queue = VecDeque::new();
+    queue.push_back(position);
 
-        // Search shortest path
-        let (dist, _, step) =
-            find_shortest_paths_internal(&mut search_grid, &position, target, grid.width, 0);
-        assert!(dist > 0);
-        shortest_paths.push(ShortestPath {
-            target: *target,
-            distance: dist as usize,
-            initial_step: step,
-        });
+    // BFS
+    while let Some(pos) = queue.pop_front() {
+        let this = search_grid[pos.y * grid.width + pos.x];
+
+        // Above
+        let above = &mut search_grid[(pos.y - 1) * grid.width + pos.x];
+        if above.0 == 0 {
+            queue.push_back(pos.above());
+            above.0 = if pos == position { 1 } else { this.0 + 1 };
+            above.1 = if pos == position { pos.above() } else { this.1 };
+        }
+
+        // Left
+        let left = &mut search_grid[pos.y * grid.width + pos.x - 1];
+        if left.0 == 0 {
+            queue.push_back(pos.left());
+            left.0 = if pos == position { 1 } else { this.0 + 1 };
+            left.1 = if pos == position { pos.left() } else { this.1 };
+        }
+
+        // Right
+        let right = &mut search_grid[pos.y * grid.width + pos.x + 1];
+        if right.0 == 0 {
+            queue.push_back(pos.right());
+            right.0 = if pos == position { 1 } else { this.0 + 1 };
+            right.1 = if pos == position { pos.right() } else { this.1 };
+        }
+
+        // Below
+        let below = &mut search_grid[(pos.y + 1) * grid.width + pos.x];
+        if below.0 == 0 {
+            queue.push_back(pos.below());
+            below.0 = if pos == position { 1 } else { this.0 + 1 };
+            below.1 = if pos == position { pos.below() } else { this.1 };
+        }
+    }
+
+    // Summarize results
+    for target in targets {
+        let t = search_grid[target.y * grid.width + target.x];
+        if t.0 > 0 {
+            shortest_paths.push(ShortestPath {
+                target: *target,
+                distance: t.0,
+                initial_step: t.1,
+            });
+        }
     }
 
     shortest_paths.sort_by_key(|path| path.distance);
     shortest_paths
-}
-
-fn find_shortest_paths_internal(
-    mut search_grid: &mut Vec<isize>,
-    position: &GridPosition,
-    target: &GridPosition,
-    width: usize,
-    depth: usize,
-) -> (isize, GridPosition, GridPosition) {
-    let value = search_grid[position.y * width + position.x];
-
-    // Abort if already visited (but not yet a result) or blocked
-    if value < 0 || value == isize::max_value() {
-        return (value, *position, *position);
-    }
-
-    // Abort if target found
-    if position == target {
-        return (1, *position, *position);
-    }
-
-    // Abort if we have already evaluated this cell
-    if value > 0 {
-        return (value + 1, *position, *position);
-    }
-
-    search_grid[position.y * width + position.x] = -1;
-    let mut min = (isize::max_value(), *position, *position);
-    let above = find_shortest_paths_internal(
-        &mut search_grid,
-        &position.above(),
-        target,
-        width,
-        depth + 1,
-    );
-    if above.0 > 0 && above.0 < min.0 {
-        min = above;
-    }
-    if depth == 0 {
-        clean_visited_cells(&mut search_grid);
-    }
-    let left =
-        find_shortest_paths_internal(&mut search_grid, &position.left(), target, width, depth + 1);
-    if left.0 > 0 && left.0 < min.0 {
-        min = left;
-    }
-    if depth == 0 {
-        clean_visited_cells(&mut search_grid);
-    }
-    let right = find_shortest_paths_internal(
-        &mut search_grid,
-        &position.right(),
-        target,
-        width,
-        depth + 1,
-    );
-    if right.0 > 0 && right.0 < min.0 {
-        min = right;
-    }
-    if depth == 0 {
-        clean_visited_cells(&mut search_grid);
-    }
-    let below = find_shortest_paths_internal(
-        &mut search_grid,
-        &position.below(),
-        target,
-        width,
-        depth + 1,
-    );
-    if below.0 > 0 && below.0 < min.0 {
-        min = below;
-    }
-
-    min.2 = min.1;
-    min.1 = *position;
-
-    if min.0 < isize::max_value() {
-        search_grid[position.y * width + position.x] = min.0;
-        clean_neighbour_cells(&mut search_grid, &position, width)
-    }
-
-    if min.0 < isize::max_value() {
-        min.0 += 1;
-    }
-    min
-}
-
-fn clean_visited_cells(search_grid: &mut Vec<isize>) {
-    search_grid
-        .iter_mut()
-        .filter(|c| **c < isize::max_value())
-        .for_each(|c| *c = 0);
-}
-
-fn clean_neighbour_cells(search_grid: &mut Vec<isize>, position: &GridPosition, width: usize) {
-    if search_grid[(position.y - 1) * width + position.x] < 0 {
-        search_grid[(position.y - 1) * width + position.x] = 0;
-    }
-    if search_grid[position.y * width + position.x - 1] < 0 {
-        search_grid[position.y * width + position.x - 1] = 0;
-    }
-    if search_grid[position.y * width + position.x + 1] < 0 {
-        search_grid[position.y * width + position.x + 1] = 0;
-    }
-    if search_grid[(position.y + 1) * width + position.x] < 0 {
-        search_grid[(position.y + 1) * width + position.x] = 0;
-    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -671,7 +610,7 @@ mod tests {
         let combat = Combat::create(&input);
         let shortest_paths = find_shortest_paths(
             &combat.grid,
-            &GridPosition { x: 1, y: 1 },
+            GridPosition { x: 1, y: 1 },
             &[
                 GridPosition { x: 3, y: 1 },
                 GridPosition { x: 5, y: 1 },
@@ -685,7 +624,7 @@ mod tests {
         assert_eq!(
             ShortestPath {
                 target: GridPosition { x: 3, y: 1 },
-                distance: 3,
+                distance: 2,
                 initial_step: GridPosition { x: 2, y: 1 },
             },
             shortest_paths[0]
@@ -693,7 +632,7 @@ mod tests {
         assert_eq!(
             ShortestPath {
                 target: GridPosition { x: 2, y: 2 },
-                distance: 3,
+                distance: 2,
                 initial_step: GridPosition { x: 2, y: 1 },
             },
             shortest_paths[1]
@@ -701,7 +640,7 @@ mod tests {
         assert_eq!(
             ShortestPath {
                 target: GridPosition { x: 1, y: 3 },
-                distance: 3,
+                distance: 2,
                 initial_step: GridPosition { x: 1, y: 2 },
             },
             shortest_paths[2]
@@ -709,26 +648,10 @@ mod tests {
         assert_eq!(
             ShortestPath {
                 target: GridPosition { x: 3, y: 3 },
-                distance: 5,
+                distance: 4,
                 initial_step: GridPosition { x: 2, y: 1 },
             },
             shortest_paths[3]
-        );
-        assert_eq!(
-            ShortestPath {
-                target: GridPosition { x: 5, y: 1 },
-                distance: isize::max_value() as usize,
-                initial_step: GridPosition { x: 1, y: 1 },
-            },
-            shortest_paths[4]
-        );
-        assert_eq!(
-            ShortestPath {
-                target: GridPosition { x: 5, y: 2 },
-                distance: isize::max_value() as usize,
-                initial_step: GridPosition { x: 1, y: 1 },
-            },
-            shortest_paths[5]
         );
     }
 }
