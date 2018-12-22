@@ -23,4 +23,5 @@ members = [
     "go_with_the_flow",
     "a_regular_map",
     "chronal_conversion",
+    "mode_maze",
 ]
