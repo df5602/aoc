@@ -45,6 +45,28 @@ enum Direction {
     Right,
 }
 
+impl Direction {
+    // TODO: misleading: left curve = '\', i.e. "turn left" is whatever is appropriate here...
+    fn turn_left(self) -> Direction {
+        match self {
+            Direction::Up => Direction::Left,
+            Direction::Down => Direction::Right,
+            Direction::Left => Direction::Up,
+            Direction::Right => Direction::Down,
+        }
+    }
+
+    // TODO: misleading: right curve = '/', i.e. "turn right" is whatever is appropriate here...
+    fn turn_right(self) -> Direction {
+        match self {
+            Direction::Up => Direction::Right,
+            Direction::Down => Direction::Left,
+            Direction::Left => Direction::Down,
+            Direction::Right => Direction::Up,
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 enum Turn {
     Left,
@@ -223,26 +245,28 @@ impl Grid {
         let mut collision = false;
 
         match (self.at(next_track.0, next_track.1), cart.direction) {
-            (Cell::VerticalTrack, Direction::Up) | (Cell::VerticalTrack, Direction::Down) => {
+            (Cell::VerticalTrack, Direction::Up)
+            | (Cell::VerticalTrack, Direction::Down)
+            | (Cell::HorizontalTrack, Direction::Left)
+            | (Cell::HorizontalTrack, Direction::Right) => {
                 // Normal move up/down
-                let shadowed = self.retrieve_shadowed(cart.x, cart.y);
-                self.store_shadowed(next_track.0, next_track.1);
-                self.set_at(cart.x, cart.y, shadowed);
-                let stored_cart = self.retrieve_cart(cart);
-                stored_cart.x = next_track.0;
-                stored_cart.y = next_track.1;
-                let cart = *stored_cart;
+                let cart = self.make_move(cart, next_track, cart.direction);
                 self.set_at(cart.x, cart.y, Cell::Cart(cart));
             }
+            (Cell::LeftCurve, _) => {
+                // Turn left
+                let cart = self.make_move(cart, next_track, cart.direction.turn_left());
+                self.set_at(cart.x, cart.y, Cell::Cart(cart));
+            }
+            (Cell::RightCurve, _) => {
+                // Turn right
+                let cart = self.make_move(cart, next_track, cart.direction.turn_right());
+                self.set_at(cart.x, cart.y, Cell::Cart(cart));
+            }
+            // TODO: intersection
             (Cell::Cart(other_cart), _) => {
                 // Collision
-                let shadowed = self.retrieve_shadowed(cart.x, cart.y);
-                self.set_at(cart.x, cart.y, shadowed);
-                self.store_shadowed(next_track.0, next_track.1);
-                let stored_cart = self.retrieve_cart(cart);
-                stored_cart.x = next_track.0;
-                stored_cart.y = next_track.1;
-                let cart = *stored_cart;
+                let cart = self.make_move(cart, next_track, cart.direction);
                 self.set_at(cart.x, cart.y, Cell::Collision(cart, other_cart));
                 collision = true;
             }
@@ -250,6 +274,17 @@ impl Grid {
         }
 
         collision
+    }
+
+    fn make_move(&mut self, cart: Cart, next: (usize, usize), dir: Direction) -> Cart {
+        let shadowed = self.retrieve_shadowed(cart.x, cart.y);
+        self.store_shadowed(next.0, next.1);
+        self.set_at(cart.x, cart.y, shadowed);
+        let stored_cart = self.retrieve_cart(cart);
+        stored_cart.x = next.0;
+        stored_cart.y = next.1;
+        stored_cart.direction = dir;
+        *stored_cart
     }
 
     fn next_track(&self, cart: Cart) -> (usize, usize) {
