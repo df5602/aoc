@@ -199,7 +199,6 @@ impl Map {
                 }
             }
 
-            let search_pos = &mut search_grid[state.pos_y * self.width + state.pos_x];
             if state.time < search_pos.0 {
                 search_pos.0 = state.time;
                 search_pos.1 = state.equipment;
