@@ -24,4 +24,5 @@ members = [
     "a_regular_map",
     "chronal_conversion",
     "mode_maze",
+    "experimental_emergency_teleportation",
 ]

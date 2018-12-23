@@ -85,6 +85,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "experimental_emergency_teleportation"
+version = "0.1.0"
+dependencies = [
+ "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "regex 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "util 0.1.0",
+]
+
+[[package]]
 name = "fabric_slicing"
 version = "0.1.0"
 dependencies = [

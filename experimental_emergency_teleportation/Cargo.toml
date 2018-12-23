@@ -1,0 +1,10 @@
+[package]
+name = "experimental_emergency_teleportation"
+version = "0.1.0"
+authors = ["df5602 <dominik@fankhausers.ch>"]
+edition = "2018"
+
+[dependencies]
+util = { path = "../util" }
+regex = "1"
+lazy_static = "1.2.0"
