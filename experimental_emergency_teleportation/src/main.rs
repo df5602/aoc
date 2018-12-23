@@ -28,9 +28,37 @@ fn main() {
         }
     };
 
-    for nanobot in input {
-        println!("{:?}", nanobot);
+    let strongest_nanobot = find_strongest_nanobot(&input);
+    println!("Strongest nanobot: {:?}", strongest_nanobot);
+
+    let number_in_range = number_of_nanobots_in_range(strongest_nanobot, &input);
+    println!("Number of nanobots in range: {}", number_in_range);
+}
+
+fn find_strongest_nanobot(nanobots: &[Nanobot]) -> Nanobot {
+    let mut strongest = Nanobot {
+        position: Point3D { x: 0, y: 0, z: 0 },
+        signal_radius: usize::min_value(),
+    };
+
+    for nanobot in nanobots {
+        if nanobot.signal_radius > strongest.signal_radius {
+            strongest = *nanobot;
+        }
     }
+
+    strongest
+}
+
+fn number_of_nanobots_in_range(nanobot: Nanobot, others: &[Nanobot]) -> usize {
+    let mut number_in_range = 0;
+    for other_bot in others {
+        if nanobot.position.manhattan_distance_to(other_bot.position) <= nanobot.signal_radius {
+            number_in_range += 1;
+        }
+    }
+
+    number_in_range
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -38,6 +66,12 @@ struct Point3D {
     x: isize,
     y: isize,
     z: isize,
+}
+
+impl Point3D {
+    fn manhattan_distance_to(self, other: Point3D) -> usize {
+        ((other.x - self.x).abs() + (other.y - self.y).abs() + (other.z - self.z).abs()) as usize
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
