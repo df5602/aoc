@@ -285,11 +285,7 @@ impl Grid {
         // Move all carts
         for cart in carts {
             // Make sure current cart is still running
-            if dead_carts
-                .iter()
-                .find(|&&c: &&Cart| c.id == cart.id)
-                .is_some()
-            {
+            if dead_carts.iter().any(|&c: &Cart| c.id == cart.id) {
                 continue;
             }
 

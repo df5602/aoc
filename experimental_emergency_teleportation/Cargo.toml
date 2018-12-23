@@ -8,3 +8,4 @@ edition = "2018"
 util = { path = "../util" }
 regex = "1"
 lazy_static = "1.2.0"
+rand = "0.6"
