@@ -31,7 +31,8 @@ fn main() {
     loop {
         let collision = grid.move_carts();
         println!("{}", grid);
-        if collision {
+        if let Some(collision) = collision {
+            println!("Collision at ({},{})", collision.0, collision.1);
             break;
         }
     }
@@ -46,8 +47,8 @@ enum Direction {
 }
 
 impl Direction {
-    // TODO: misleading: left curve = '\', i.e. "turn left" is whatever is appropriate here...
-    fn turn_left(self) -> Direction {
+    // left curve = '\', i.e. "turn left" is whatever is appropriate here...
+    fn turn_on_left_curve(self) -> Direction {
         match self {
             Direction::Up => Direction::Left,
             Direction::Down => Direction::Right,
@@ -56,13 +57,33 @@ impl Direction {
         }
     }
 
-    // TODO: misleading: right curve = '/', i.e. "turn right" is whatever is appropriate here...
-    fn turn_right(self) -> Direction {
+    // right curve = '/', i.e. "turn right" is whatever is appropriate here...
+    fn turn_on_right_curve(self) -> Direction {
         match self {
             Direction::Up => Direction::Right,
             Direction::Down => Direction::Left,
             Direction::Left => Direction::Down,
             Direction::Right => Direction::Up,
+        }
+    }
+
+    // turn left from the point of view of the cart
+    fn turn_left(self) -> Direction {
+        match self {
+            Direction::Up => Direction::Left,
+            Direction::Down => Direction::Right,
+            Direction::Left => Direction::Down,
+            Direction::Right => Direction::Up,
+        }
+    }
+
+    // turn right from the point of view of the cart
+    fn turn_right(self) -> Direction {
+        match self {
+            Direction::Up => Direction::Right,
+            Direction::Down => Direction::Left,
+            Direction::Left => Direction::Up,
+            Direction::Right => Direction::Down,
         }
     }
 }
@@ -72,6 +93,16 @@ enum Turn {
     Left,
     Straight,
     Right,
+}
+
+impl Turn {
+    fn next_turn(self) -> Turn {
+        match self {
+            Turn::Left => Turn::Straight,
+            Turn::Straight => Turn::Right,
+            Turn::Right => Turn::Left,
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -219,7 +250,7 @@ impl Grid {
         }
     }
 
-    fn move_carts(&mut self) -> bool {
+    fn move_carts(&mut self) -> Option<(usize, usize)> {
         // Take snapshot of current positions and sort
         let mut carts = self.carts.clone();
         carts.sort_unstable_by(|a, b| {
@@ -232,17 +263,17 @@ impl Grid {
 
         // Move all carts
         for cart in carts {
-            if self.move_cart(cart) {
-                return true;
+            if let Some(collision) = self.move_cart(cart) {
+                return Some(collision);
             }
         }
-        false
+        None
     }
 
-    fn move_cart(&mut self, cart: Cart) -> bool {
+    fn move_cart(&mut self, cart: Cart) -> Option<(usize, usize)> {
         let next_track = self.next_track(cart);
 
-        let mut collision = false;
+        let mut collision = None;
 
         match (self.at(next_track.0, next_track.1), cart.direction) {
             (Cell::VerticalTrack, Direction::Up)
@@ -250,25 +281,36 @@ impl Grid {
             | (Cell::HorizontalTrack, Direction::Left)
             | (Cell::HorizontalTrack, Direction::Right) => {
                 // Normal move up/down
-                let cart = self.make_move(cart, next_track, cart.direction);
+                let cart = self.make_move(cart, next_track, cart.direction, None);
                 self.set_at(cart.x, cart.y, Cell::Cart(cart));
             }
             (Cell::LeftCurve, _) => {
-                // Turn left
-                let cart = self.make_move(cart, next_track, cart.direction.turn_left());
+                // Turn on left curve
+                let cart =
+                    self.make_move(cart, next_track, cart.direction.turn_on_left_curve(), None);
                 self.set_at(cart.x, cart.y, Cell::Cart(cart));
             }
             (Cell::RightCurve, _) => {
-                // Turn right
-                let cart = self.make_move(cart, next_track, cart.direction.turn_right());
+                // Turn on right curve
+                let cart =
+                    self.make_move(cart, next_track, cart.direction.turn_on_right_curve(), None);
                 self.set_at(cart.x, cart.y, Cell::Cart(cart));
             }
-            // TODO: intersection
+            (Cell::Intersection, _) => {
+                let next_turn = cart.last_turn.next_turn();
+                let next_direction = match next_turn {
+                    Turn::Left => cart.direction.turn_left(),
+                    Turn::Straight => cart.direction,
+                    Turn::Right => cart.direction.turn_right(),
+                };
+                let cart = self.make_move(cart, next_track, next_direction, Some(next_turn));
+                self.set_at(cart.x, cart.y, Cell::Cart(cart));
+            }
             (Cell::Cart(other_cart), _) => {
                 // Collision
-                let cart = self.make_move(cart, next_track, cart.direction);
+                let cart = self.make_move(cart, next_track, cart.direction, None);
                 self.set_at(cart.x, cart.y, Cell::Collision(cart, other_cart));
-                collision = true;
+                collision = Some((cart.x, cart.y));
             }
             _ => panic!("illegal move"),
         }
@@ -276,7 +318,13 @@ impl Grid {
         collision
     }
 
-    fn make_move(&mut self, cart: Cart, next: (usize, usize), dir: Direction) -> Cart {
+    fn make_move(
+        &mut self,
+        cart: Cart,
+        next: (usize, usize),
+        dir: Direction,
+        turn: Option<Turn>,
+    ) -> Cart {
         let shadowed = self.retrieve_shadowed(cart.x, cart.y);
         self.store_shadowed(next.0, next.1);
         self.set_at(cart.x, cart.y, shadowed);
@@ -284,6 +332,9 @@ impl Grid {
         stored_cart.x = next.0;
         stored_cart.y = next.1;
         stored_cart.direction = dir;
+        if let Some(turn) = turn {
+            stored_cart.last_turn = turn;
+        }
         *stored_cart
     }
 
