@@ -28,14 +28,36 @@ fn main() {
     let mut grid = Grid::create(&input);
     println!("{}", grid);
 
+    run_simulation(&mut grid, false);
+
+    let mut grid = Grid::create(&input);
+    println!("{}", grid);
+    run_simulation(&mut grid, true);
+}
+
+fn run_simulation(grid: &mut Grid, remove_collisions: bool) {
     loop {
-        let collision = grid.move_carts();
+        let outcome = grid.move_carts(remove_collisions);
         println!("{}", grid);
-        if let Some(collision) = collision {
-            println!("Collision at ({},{})", collision.0, collision.1);
-            break;
+        match outcome {
+            Outcome::Running => continue,
+            Outcome::Collision(collision) => {
+                println!("Collision at ({},{})", collision.0, collision.1);
+                break;
+            }
+            Outcome::LastCartStanding(position) => {
+                println!("Last cart standing ({},{})", position.0, position.1);
+                break;
+            }
         }
     }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+enum Outcome {
+    Running,
+    Collision((usize, usize)),
+    LastCartStanding((usize, usize)),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -250,7 +272,7 @@ impl Grid {
         }
     }
 
-    fn move_carts(&mut self) -> Option<(usize, usize)> {
+    fn move_carts(&mut self, remove_collisions: bool) -> Outcome {
         // Take snapshot of current positions and sort
         let mut carts = self.carts.clone();
         carts.sort_unstable_by(|a, b| {
@@ -261,16 +283,50 @@ impl Grid {
             }
         });
 
+        // Dead carts
+        let mut dead_carts = Vec::new();
+
         // Move all carts
         for cart in carts {
+            // Make sure current cart is still running
+            if dead_carts
+                .iter()
+                .find(|&&c: &&Cart| c.id == cart.id)
+                .is_some()
+            {
+                continue;
+            }
+
             if let Some(collision) = self.move_cart(cart) {
-                return Some(collision);
+                if !remove_collisions {
+                    return Outcome::Collision((collision.0.x, collision.0.y));
+                } else {
+                    // Remove carts from list of carts
+                    self.carts
+                        .retain(|cart| cart.id != collision.0.id && cart.id != collision.1.id);
+
+                    // Also remove carts from carts snapshot
+                    // (We can't modify carts at this point since we're iterating over it, so store "dead" carts in list)
+                    dead_carts.push(collision.0);
+                    dead_carts.push(collision.1);
+
+                    // Update map
+                    let shadowed = self.retrieve_shadowed(collision.0.x, collision.0.y);
+                    self.set_at(collision.0.x, collision.0.y, shadowed);
+                }
             }
         }
-        None
+
+        if self.carts.len() == 1 {
+            let cart = self.carts[0];
+            Outcome::LastCartStanding((cart.x, cart.y))
+        } else {
+            assert!(!self.carts.is_empty());
+            Outcome::Running
+        }
     }
 
-    fn move_cart(&mut self, cart: Cart) -> Option<(usize, usize)> {
+    fn move_cart(&mut self, cart: Cart) -> Option<(Cart, Cart)> {
         let next_track = self.next_track(cart);
 
         let mut collision = None;
@@ -281,19 +337,29 @@ impl Grid {
             | (Cell::HorizontalTrack, Direction::Left)
             | (Cell::HorizontalTrack, Direction::Right) => {
                 // Normal move up/down
-                let cart = self.make_move(cart, next_track, cart.direction, None);
+                let cart = self.make_move(cart, next_track, cart.direction, None, true);
                 self.set_at(cart.x, cart.y, Cell::Cart(cart));
             }
             (Cell::LeftCurve, _) => {
                 // Turn on left curve
-                let cart =
-                    self.make_move(cart, next_track, cart.direction.turn_on_left_curve(), None);
+                let cart = self.make_move(
+                    cart,
+                    next_track,
+                    cart.direction.turn_on_left_curve(),
+                    None,
+                    true,
+                );
                 self.set_at(cart.x, cart.y, Cell::Cart(cart));
             }
             (Cell::RightCurve, _) => {
                 // Turn on right curve
-                let cart =
-                    self.make_move(cart, next_track, cart.direction.turn_on_right_curve(), None);
+                let cart = self.make_move(
+                    cart,
+                    next_track,
+                    cart.direction.turn_on_right_curve(),
+                    None,
+                    true,
+                );
                 self.set_at(cart.x, cart.y, Cell::Cart(cart));
             }
             (Cell::Intersection, _) => {
@@ -303,14 +369,14 @@ impl Grid {
                     Turn::Straight => cart.direction,
                     Turn::Right => cart.direction.turn_right(),
                 };
-                let cart = self.make_move(cart, next_track, next_direction, Some(next_turn));
+                let cart = self.make_move(cart, next_track, next_direction, Some(next_turn), true);
                 self.set_at(cart.x, cart.y, Cell::Cart(cart));
             }
             (Cell::Cart(other_cart), _) => {
                 // Collision
-                let cart = self.make_move(cart, next_track, cart.direction, None);
+                let cart = self.make_move(cart, next_track, cart.direction, None, false);
                 self.set_at(cart.x, cart.y, Cell::Collision(cart, other_cart));
-                collision = Some((cart.x, cart.y));
+                collision = Some((cart, other_cart));
             }
             _ => panic!("illegal move"),
         }
@@ -324,9 +390,12 @@ impl Grid {
         next: (usize, usize),
         dir: Direction,
         turn: Option<Turn>,
+        shadow: bool,
     ) -> Cart {
         let shadowed = self.retrieve_shadowed(cart.x, cart.y);
-        self.store_shadowed(next.0, next.1);
+        if shadow {
+            self.store_shadowed(next.0, next.1);
+        }
         self.set_at(cart.x, cart.y, shadowed);
         let stored_cart = self.retrieve_cart(cart);
         stored_cart.x = next.0;
