@@ -26,19 +26,15 @@ fn main() {
     let input: Vec<String> = input.lines().map(|s| s.parse().unwrap()).collect();
 
     let mut grid = Grid::create(&input);
-    println!("{}", grid);
-
     run_simulation(&mut grid, false);
 
     let mut grid = Grid::create(&input);
-    println!("{}", grid);
     run_simulation(&mut grid, true);
 }
 
 fn run_simulation(grid: &mut Grid, remove_collisions: bool) {
     loop {
         let outcome = grid.move_carts(remove_collisions);
-        println!("{}", grid);
         match outcome {
             Outcome::Running => continue,
             Outcome::Collision(collision) => {
