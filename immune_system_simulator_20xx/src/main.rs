@@ -1,6 +1,7 @@
 extern crate regex;
 extern crate util;
 
+use std::collections::HashMap;
 use std::env;
 
 use regex::Regex;
@@ -24,15 +25,60 @@ fn main() {
         }
     };
 
-    let (immune_system, infection) = parse_input(&input);
-    println!("Immune system:");
+    let (mut immune_system, mut infection) = parse_input(&input);
+
+    fight_round(&mut immune_system, &mut infection);
+}
+
+fn fight_round(immune_system: &mut Vec<Group>, infection: &mut Vec<Group>) {
+    immune_system.sort_by(|a, b| {
+        if a.effective_power() == b.effective_power() {
+            b.initiative.cmp(&a.initiative)
+        } else {
+            b.effective_power().cmp(&a.effective_power())
+        }
+    });
+    infection.sort_by(|a, b| {
+        if a.effective_power() == b.effective_power() {
+            b.initiative.cmp(&a.initiative)
+        } else {
+            b.effective_power().cmp(&a.effective_power())
+        }
+    });
+
+    let mut targets = target_selection(immune_system, infection);
+}
+
+fn target_selection(
+    immune_system: &mut Vec<Group>,
+    infection: &mut Vec<Group>,
+) -> HashMap<usize, Option<usize>> {
+    let mut targets: HashMap<usize, Option<usize>> = HashMap::new();
+
+    let mut immune_system_targets = immune_system.clone();
+    let mut infection_targets = infection.clone();
+
     for group in immune_system {
-        println!("{:?}", group);
+        if let Some(target) = group.select_target(&infection_targets) {
+            let target_id = target.group_id;
+            infection_targets.retain(|group| group.group_id != target_id);
+            targets.insert(group.group_id, Some(target_id));
+        } else {
+            targets.insert(group.group_id, None);
+        }
     }
-    println!("Infection:");
+
     for group in infection {
-        println!("{:?}", group);
+        if let Some(target) = group.select_target(&immune_system_targets) {
+            let target_id = target.group_id;
+            immune_system_targets.retain(|group| group.group_id != target_id);
+            targets.insert(group.group_id, Some(target_id));
+        } else {
+            targets.insert(group.group_id, None);
+        }
     }
+
+    targets
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -61,6 +107,63 @@ struct Group {
     initiative: usize,
     weaknesses: Vec<AttackType>,
     immunities: Vec<AttackType>,
+}
+
+impl Group {
+    fn effective_power(&self) -> usize {
+        self.units * self.attack_damage
+    }
+
+    fn calculate_damage(&self, other: &Group) -> usize {
+        if other.immunities.contains(&self.attack_type) {
+            0
+        } else if other.weaknesses.contains(&self.attack_type) {
+            2 * self.effective_power()
+        } else {
+            self.effective_power()
+        }
+    }
+
+    fn select_target<'a>(&self, enemies: &'a [Group]) -> Option<&'a Group> {
+        let mut chosen = None;
+        let mut max_damage = usize::min_value();
+        let mut max_power = usize::min_value();
+        let mut max_initiative = usize::min_value();
+
+        for enemy in enemies.iter() {
+            let damage = self.calculate_damage(enemy);
+            if damage >= max_damage {
+                let power = enemy.effective_power();
+                let initiative = enemy.initiative;
+                if damage > max_damage {
+                    max_power = power;
+                    max_initiative = initiative;
+                    chosen = Some(enemy);
+                } else {
+                    // damage is equal
+                    if power >= max_power {
+                        if power > max_power {
+                            max_initiative = initiative;
+                            chosen = Some(enemy);
+                        } else {
+                            // damage + power is equal
+                            if initiative > max_initiative {
+                                max_initiative = initiative;
+                                chosen = Some(enemy);
+                            }
+                        }
+                        max_power = power;
+                    }
+                }
+                max_damage = damage;
+            }
+        }
+
+        if max_damage == 0 {
+            chosen = None;
+        }
+        chosen
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
