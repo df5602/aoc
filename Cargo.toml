@@ -25,4 +25,5 @@ members = [
     "chronal_conversion",
     "mode_maze",
     "experimental_emergency_teleportation",
+    "immune_system_simulator_20xx",
 ]

@@ -1,0 +1,9 @@
+[package]
+name = "immune_system_simulator_20xx"
+version = "0.1.0"
+authors = ["df5602 <dominik@fankhausers.ch>"]
+edition = "2018"
+
+[dependencies]
+util = { path = "../util" }
+regex = "1"
