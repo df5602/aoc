@@ -25,20 +25,62 @@ fn main() {
         }
     };
 
-    let (mut immune_system, mut infection) = parse_input(&input);
+    let (immune_system, infection) = parse_input(&input);
 
-    simulate_fight(&mut immune_system, &mut infection);
+    simulate_fight(&mut immune_system.clone(), &mut infection.clone(), 0);
+
+    for boost in 1.. {
+        println!("Boost: {}", boost);
+        if simulate_fight(&mut immune_system.clone(), &mut infection.clone(), boost)
+            == ArmyType::ImmuneSystem
+        {
+            break;
+        }
+    }
 }
 
-fn simulate_fight(immune_system: &mut Vec<Group>, infection: &mut Vec<Group>) {
-    while !immune_system.is_empty() && !infection.is_empty() {
-        fight_round(immune_system, infection);
+fn give_boost(immune_system: &mut [Group], boost: usize) {
+    immune_system
+        .iter_mut()
+        .for_each(|group| group.attack_damage += boost);
+}
+
+fn simulate_fight(
+    immune_system: &mut Vec<Group>,
+    infection: &mut Vec<Group>,
+    boost: usize,
+) -> ArmyType {
+    if boost > 0 {
+        give_boost(immune_system, boost);
     }
 
+    let mut remaining_units = get_remaining_units(&immune_system) + get_remaining_units(&infection);
+    while !immune_system.is_empty() && !infection.is_empty() {
+        fight_round(immune_system, infection);
+
+        let remaining_units_now =
+            get_remaining_units(&immune_system) + get_remaining_units(&infection);
+        if remaining_units == remaining_units_now {
+            // Deadlock
+            break;
+        }
+        remaining_units = remaining_units_now;
+    }
+
+    let remaining_immune_system = get_remaining_units(&immune_system);
+    let remaining_infection = get_remaining_units(&infection);
+
     println!("Immune system:");
-    println!("Remaining units: {}", get_remaining_units(&immune_system));
+    println!("Remaining units: {}", remaining_immune_system);
     println!("Infection:");
-    println!("Remaining units: {}", get_remaining_units(&infection));
+    println!("Remaining units: {}", remaining_infection);
+
+    if remaining_immune_system > 0 && remaining_infection == 0 {
+        ArmyType::ImmuneSystem
+    } else {
+        // let's treat a deadlock as a win for team infection
+        ArmyType::Infection
+    }
 }
 
 fn get_remaining_units(groups: &[Group]) -> usize {
