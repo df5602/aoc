@@ -27,10 +27,85 @@ fn main() {
 
     let (mut immune_system, mut infection) = parse_input(&input);
 
-    fight_round(&mut immune_system, &mut infection);
+    while !immune_system.is_empty() && !infection.is_empty() {
+        println!("Immune system:");
+        for group in immune_system.iter() {
+            println!("Group {} contains {} units", group.group_id, group.units);
+        }
+        println!("Infection:");
+        for group in infection.iter() {
+            println!("Group {} contains {} units", group.group_id, group.units);
+        }
+
+        fight_round(&mut immune_system, &mut infection);
+    }
+
+    println!("Immune system:");
+    println!("Remaining units: {}", get_remaining_units(&immune_system));
+    println!("Infection:");
+    println!("Remaining units: {}", get_remaining_units(&infection));
+}
+
+fn get_remaining_units(groups: &[Group]) -> usize {
+    groups.iter().map(|group| group.units).sum()
 }
 
 fn fight_round(immune_system: &mut Vec<Group>, infection: &mut Vec<Group>) {
+    let targets = target_selection(immune_system, infection);
+    let attack_order = get_attack_order(immune_system, infection);
+    let mut dead_groups: Vec<Group> = Vec::new();
+
+    for attacker in attack_order {
+        // Check whether still alive
+        if dead_groups.iter().any(|group| group.group_id == attacker.group_id) {
+            continue;
+        }
+
+        // Get attacker
+        let attacker = match attacker.army_id {
+            ArmyType::ImmuneSystem => {
+                let pos = immune_system.iter().position(|group| group.group_id == attacker.group_id).unwrap();
+                immune_system[pos].clone()
+            }
+            ArmyType::Infection => {
+                let pos = infection.iter().position(|group| group.group_id == attacker.group_id).unwrap();
+                infection[pos].clone()
+            }
+        };
+
+        // Get victim
+        let (mut victim, pos) = if let Some(Some(victim)) = targets.get(&attacker.group_id) {
+            match attacker.army_id {
+                ArmyType::ImmuneSystem => {
+                    let pos = infection.iter().position(|group| group.group_id == *victim).unwrap();
+                    (&mut infection[pos], pos)
+                }
+                ArmyType::Infection => {
+                    let pos = immune_system.iter().position(|group| group.group_id == *victim).unwrap();
+                    (&mut immune_system[pos], pos)
+                }
+            }
+        } else {
+            continue;
+        };
+
+        // Deal damage
+        if deal_damage(&attacker, &mut victim) {
+            let dead_victim = match attacker.army_id {
+                ArmyType::ImmuneSystem => infection.remove(pos),
+                ArmyType::Infection => immune_system.remove(pos),
+            };
+            dead_groups.push(dead_victim);
+        }
+    }
+}
+
+fn target_selection(
+    immune_system: &mut Vec<Group>,
+    infection: &mut Vec<Group>,
+) -> HashMap<usize, Option<usize>> {
+    let mut targets: HashMap<usize, Option<usize>> = HashMap::new();
+
     immune_system.sort_by(|a, b| {
         if a.effective_power() == b.effective_power() {
             b.initiative.cmp(&a.initiative)
@@ -45,15 +120,6 @@ fn fight_round(immune_system: &mut Vec<Group>, infection: &mut Vec<Group>) {
             b.effective_power().cmp(&a.effective_power())
         }
     });
-
-    let mut targets = target_selection(immune_system, infection);
-}
-
-fn target_selection(
-    immune_system: &mut Vec<Group>,
-    infection: &mut Vec<Group>,
-) -> HashMap<usize, Option<usize>> {
-    let mut targets: HashMap<usize, Option<usize>> = HashMap::new();
 
     let mut immune_system_targets = immune_system.clone();
     let mut infection_targets = infection.clone();
@@ -79,6 +145,36 @@ fn target_selection(
     }
 
     targets
+}
+
+fn get_attack_order(immune_system: &[Group], infection: &[Group]) -> Vec<Group> {
+    let mut attack_order = Vec::new();
+    attack_order.extend_from_slice(immune_system);
+    attack_order.extend_from_slice(infection);
+
+    attack_order.sort_by(|a, b| b.initiative.cmp(&a.initiative));
+
+    attack_order
+}
+
+fn deal_damage(attacker: &Group, victim: &mut Group) -> bool {
+    //println!("Attacker: {:?}", attacker);
+    //println!("Victim: {:?}", victim);
+    let damage = attacker.calculate_damage(victim);
+    let victim_units = victim.units;
+    let victim_hp = victim.hit_points;
+    let killed = damage / victim_hp;
+
+    println!("{:?} group {} attacks defending group {}, killing {} units", attacker.army_id, attacker.group_id,
+        victim.group_id, killed);
+    
+    if killed >= victim_units{
+        victim.units = 0;
+        true
+    } else {
+        victim.units -= killed;
+        false
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
