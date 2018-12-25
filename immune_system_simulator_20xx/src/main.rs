@@ -27,17 +27,12 @@ fn main() {
 
     let (mut immune_system, mut infection) = parse_input(&input);
 
-    while !immune_system.is_empty() && !infection.is_empty() {
-        println!("Immune system:");
-        for group in immune_system.iter() {
-            println!("Group {} contains {} units", group.group_id, group.units);
-        }
-        println!("Infection:");
-        for group in infection.iter() {
-            println!("Group {} contains {} units", group.group_id, group.units);
-        }
+    simulate_fight(&mut immune_system, &mut infection);
+}
 
-        fight_round(&mut immune_system, &mut infection);
+fn simulate_fight(immune_system: &mut Vec<Group>, infection: &mut Vec<Group>) {
+    while !immune_system.is_empty() && !infection.is_empty() {
+        fight_round(immune_system, infection);
     }
 
     println!("Immune system:");
@@ -57,18 +52,27 @@ fn fight_round(immune_system: &mut Vec<Group>, infection: &mut Vec<Group>) {
 
     for attacker in attack_order {
         // Check whether still alive
-        if dead_groups.iter().any(|group| group.group_id == attacker.group_id) {
+        if dead_groups
+            .iter()
+            .any(|group| group.group_id == attacker.group_id)
+        {
             continue;
         }
 
-        // Get attacker
+        // Update attacker
         let attacker = match attacker.army_id {
             ArmyType::ImmuneSystem => {
-                let pos = immune_system.iter().position(|group| group.group_id == attacker.group_id).unwrap();
+                let pos = immune_system
+                    .iter()
+                    .position(|group| group.group_id == attacker.group_id)
+                    .unwrap();
                 immune_system[pos].clone()
             }
             ArmyType::Infection => {
-                let pos = infection.iter().position(|group| group.group_id == attacker.group_id).unwrap();
+                let pos = infection
+                    .iter()
+                    .position(|group| group.group_id == attacker.group_id)
+                    .unwrap();
                 infection[pos].clone()
             }
         };
@@ -77,11 +81,17 @@ fn fight_round(immune_system: &mut Vec<Group>, infection: &mut Vec<Group>) {
         let (mut victim, pos) = if let Some(Some(victim)) = targets.get(&attacker.group_id) {
             match attacker.army_id {
                 ArmyType::ImmuneSystem => {
-                    let pos = infection.iter().position(|group| group.group_id == *victim).unwrap();
+                    let pos = infection
+                        .iter()
+                        .position(|group| group.group_id == *victim)
+                        .unwrap();
                     (&mut infection[pos], pos)
                 }
                 ArmyType::Infection => {
-                    let pos = immune_system.iter().position(|group| group.group_id == *victim).unwrap();
+                    let pos = immune_system
+                        .iter()
+                        .position(|group| group.group_id == *victim)
+                        .unwrap();
                     (&mut immune_system[pos], pos)
                 }
             }
@@ -158,17 +168,12 @@ fn get_attack_order(immune_system: &[Group], infection: &[Group]) -> Vec<Group> 
 }
 
 fn deal_damage(attacker: &Group, victim: &mut Group) -> bool {
-    //println!("Attacker: {:?}", attacker);
-    //println!("Victim: {:?}", victim);
     let damage = attacker.calculate_damage(victim);
     let victim_units = victim.units;
     let victim_hp = victim.hit_points;
     let killed = damage / victim_hp;
 
-    println!("{:?} group {} attacks defending group {}, killing {} units", attacker.army_id, attacker.group_id,
-        victim.group_id, killed);
-    
-    if killed >= victim_units{
+    if killed >= victim_units {
         victim.units = 0;
         true
     } else {
