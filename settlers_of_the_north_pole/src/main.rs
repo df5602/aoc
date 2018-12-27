@@ -1,5 +1,3 @@
-extern crate util;
-
 use std::collections::HashSet;
 use std::env;
 
@@ -100,7 +98,7 @@ enum Cell {
 }
 
 impl std::fmt::Display for Cell {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Cell::Open => write!(f, "."),
             Cell::Trees => write!(f, "|"),
@@ -275,7 +273,7 @@ impl Grid {
 }
 
 impl std::fmt::Display for Grid {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (i, c) in self.grid.iter().enumerate() {
             write!(f, "{}", c)?;
             if (i + 1) % self.width == 0 {

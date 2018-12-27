@@ -1,5 +1,3 @@
-extern crate util;
-
 use std::collections::HashSet;
 use std::env;
 

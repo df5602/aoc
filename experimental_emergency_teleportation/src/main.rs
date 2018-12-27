@@ -1,14 +1,10 @@
-extern crate regex;
-extern crate util;
-
-#[macro_use]
-extern crate lazy_static;
-
 use std::env;
 use std::str::FromStr;
 
 //use rand::Rng;
 use regex::Regex;
+
+use lazy_static::lazy_static;
 
 use util::input::{FileReader, FromFile};
 

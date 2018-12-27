@@ -1,5 +1,3 @@
-extern crate util;
-
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::env;
@@ -334,7 +332,7 @@ impl FromStr for Dependency {
 }
 
 impl std::fmt::Display for Dependency {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} => {}", self.before as char, self.step as char)
     }
 }

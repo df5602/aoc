@@ -1,5 +1,3 @@
-extern crate util;
-
 use std::collections::{HashMap, VecDeque};
 use std::env;
 
@@ -104,13 +102,13 @@ impl<'a> Item<'a> {
 impl<'a> Eq for Item<'a> {}
 
 impl<'a> PartialEq for Item<'a> {
-    fn eq(&self, other: &Item) -> bool {
+    fn eq(&self, other: &Item<'_>) -> bool {
         self.cursor == other.cursor && self.position == other.position
     }
 }
 
 impl<'a> Ord for Item<'a> {
-    fn cmp(&self, other: &Item) -> std::cmp::Ordering {
+    fn cmp(&self, other: &Item<'_>) -> std::cmp::Ordering {
         if self.cursor == other.cursor {
             self.position.cmp(&other.position)
         } else {
@@ -120,7 +118,7 @@ impl<'a> Ord for Item<'a> {
 }
 
 impl<'a> PartialOrd for Item<'a> {
-    fn partial_cmp(&self, other: &Item) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Item<'_>) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
@@ -382,7 +380,7 @@ impl Graph {
 }
 
 impl std::fmt::Display for Graph {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut x_min = isize::max_value();
         let mut x_max = isize::min_value();
         let mut y_min = isize::max_value();

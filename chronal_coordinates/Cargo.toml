@@ -2,6 +2,7 @@
 name = "chronal_coordinates"
 version = "0.1.0"
 authors = ["df5602 <dominik@fankhausers.ch>"]
+edition = "2018"
 
 [dependencies]
 util = { path = "../util" }

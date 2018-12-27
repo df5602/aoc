@@ -37,7 +37,7 @@ pub enum Error<E> {
 }
 
 impl<E: std::fmt::Display> std::fmt::Display for Error<E> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Error::IoError(e) => write!(f, "{}", e),
             Error::ParseError(e) => write!(f, "{}", e),
@@ -139,7 +139,7 @@ where
 
         match self.parse_regex {
             Some(ref regex) => {
-                let mut captures = match regex.captures(&buffer) {
+                let captures = match regex.captures(&buffer) {
                     Some(captures) => captures,
                     None => {
                         return Err(Error::FormatError(

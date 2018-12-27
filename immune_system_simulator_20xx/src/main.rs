@@ -1,6 +1,3 @@
-extern crate regex;
-extern crate util;
-
 use std::collections::HashMap;
 use std::env;
 

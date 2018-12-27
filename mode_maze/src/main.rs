@@ -1,5 +1,3 @@
-extern crate util;
-
 use std::collections::VecDeque;
 use std::env;
 

@@ -1,6 +1,3 @@
-extern crate chrono;
-extern crate util;
-
 use std::collections::HashMap;
 use std::env;
 use std::str::FromStr;
@@ -172,7 +169,7 @@ enum RecordParseError {
 }
 
 impl std::fmt::Display for RecordParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             RecordParseError::ParseTimeError(e) => write!(f, "Error parsing timestamp: {}", e),
             RecordParseError::ParseError(s) => write!(f, "Error parsing record: {}", s),

@@ -1,9 +1,3 @@
-extern crate regex;
-extern crate util;
-
-#[macro_use]
-extern crate lazy_static;
-
 use std::collections::VecDeque;
 use std::env;
 use std::io::BufRead;
@@ -11,6 +5,8 @@ use std::str::FromStr;
 use std::{thread, time};
 
 use regex::Regex;
+
+use lazy_static::lazy_static;
 
 use util::input::{FileReader, FromFile};
 
@@ -61,7 +57,7 @@ impl Cell {
 }
 
 impl std::fmt::Display for Cell {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Cell::Clay => write!(f, "#"),
             Cell::Sand => write!(f, "."),
@@ -384,7 +380,7 @@ impl Grid {
 }
 
 impl std::fmt::Display for Grid {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (i, c) in self.grid.iter().enumerate() {
             write!(f, "{}", c)?;
             if (i + 1) % self.width == 0 {

@@ -1,5 +1,3 @@
-extern crate util;
-
 use std::cmp::max;
 use std::env;
 use std::str::FromStr;
@@ -71,7 +69,7 @@ enum ClaimParseError {
 }
 
 impl std::fmt::Display for ClaimParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ClaimParseError::ParseIntError(e) => write!(f, "Error parsing int: {}", e),
             ClaimParseError::ParseError(s) => write!(f, "Error parsing claim: {}", s),
