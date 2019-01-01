@@ -58,7 +58,7 @@ pub struct FileReader {
     parse_regex: Option<Regex>,
 }
 
-#[allow(clippy::new_without_default_derive)]
+#[allow(clippy::new_without_default)]
 impl FileReader {
     // TODO: investigate builder pattern...
     pub fn new() -> Self {
