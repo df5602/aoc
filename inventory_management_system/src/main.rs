@@ -51,11 +51,11 @@ fn checksum(inputs: &[String]) -> u64 {
     counts.0 * counts.1
 }
 
-fn count_exact_dual_and_triple_occurrences(input: &str) -> (usize, usize) {
+fn count_exact_dual_and_triple_occurrences(input: &str) -> (u32, u32) {
     // Count number of occurrence of each letter
     let mut char_count = HashMap::new();
     for c in input.chars() {
-        let count = char_count.entry(c).or_insert(0);
+        let count = char_count.entry(c).or_insert(0u32);
         *count += 1;
     }
 
@@ -148,5 +148,22 @@ mod tests {
     fn test_common_letters() {
         assert_eq!("", common_letters("abcde", "fghij"));
         assert_eq!("fgij", common_letters("fghij", "fguij"));
+    }
+
+    #[test]
+    fn test_part_1() {
+        let input: Vec<String> = FileReader::new().read_from_file("input.txt").unwrap();
+        let checksum = checksum(&input);
+        assert_eq!(6944, checksum);
+    }
+
+    #[test]
+    fn test_part_2() {
+        let input: Vec<String> = FileReader::new().read_from_file("input.txt").unwrap();
+        let idx = find_first_match(&input, 1).unwrap();
+        assert_eq!(
+            "srijafjzloguvlntqmphenbkd",
+            common_letters(&input[idx.0], &input[idx.1])
+        );
     }
 }
