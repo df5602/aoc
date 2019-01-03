@@ -1,9 +1,10 @@
 use std::cmp::max;
 use std::env;
-use std::str::FromStr;
 
 use util::input::{FileReader, FromFile};
 use util::rectangle::Rectangle;
+
+use adhoc_derive::FromStr;
 
 fn main() {
     let input_file = match env::args().nth(1) {
@@ -56,57 +57,12 @@ fn main() {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, FromStr)]
+#[adhoc(regex = r"^#(?P<owner>\d+) @ (?P<x>\d+),(?P<y>\d+): (?P<width>\d+)x(?P<height>\d+)$")]
 struct Claim {
     owner: usize,
+    #[adhoc(construct_with = "Rectangle::new(x, y, width, height)")]
     rectangle: Rectangle,
-}
-
-#[derive(Debug)]
-enum ClaimParseError {
-    ParseIntError(std::num::ParseIntError),
-    ParseError(String),
-}
-
-impl std::fmt::Display for ClaimParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ClaimParseError::ParseIntError(e) => write!(f, "Error parsing int: {}", e),
-            ClaimParseError::ParseError(s) => write!(f, "Error parsing claim: {}", s),
-        }
-    }
-}
-
-impl From<std::num::ParseIntError> for ClaimParseError {
-    fn from(error: std::num::ParseIntError) -> Self {
-        ClaimParseError::ParseIntError(error)
-    }
-}
-
-impl FromStr for Claim {
-    type Err = ClaimParseError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let substrings: Vec<_> = s
-            .split(|c| c == '#' || c == '@' || c == ',' || c == ':' || c == 'x')
-            .filter(|s| !s.is_empty())
-            .map(|s| s.trim())
-            .collect();
-        if substrings.len() != 5 {
-            return Err(ClaimParseError::ParseError(String::from(
-                "input does not match format",
-            )));
-        }
-        Ok(Self {
-            owner: substrings[0].parse()?,
-            rectangle: Rectangle::new(
-                substrings[1].parse()?,
-                substrings[2].parse()?,
-                substrings[3].parse()?,
-                substrings[4].parse()?,
-            ),
-        })
-    }
 }
 
 #[derive(Debug)]
