@@ -7,6 +7,8 @@ use chrono::Timelike;
 
 use util::input::{FileReader, FromFile};
 
+use adhoc_derive::FromStr;
+
 fn main() {
     let input_file = match env::args().nth(1) {
         Some(input_file) => input_file,
@@ -156,54 +158,20 @@ impl FromStr for Entry {
     }
 }
 
-#[derive(Debug)]
+// Problems:
+// * This is just a work-around for the limitations of adhoc_derive (arguments need to correspond to regex capture group)
+// * Error handling not possible, because function_call(...)? is not a function all expression
+// * the trait `std::str::FromStr` is not implemented for `&str`
+fn parse_timestamp(s: String) -> NaiveDateTime {
+    NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M").unwrap()
+}
+
+#[derive(Debug, FromStr)]
+#[adhoc(regex = r"^\[(?P<timestamp>.+)\] (?P<entry>.+)$")]
 struct Record {
+    #[adhoc(construct_with = "parse_timestamp(timestamp)")]
     timestamp: NaiveDateTime,
     entry: Entry,
-}
-
-#[derive(Debug)]
-enum RecordParseError {
-    ParseTimeError(chrono::format::ParseError),
-    ParseError(String),
-}
-
-impl std::fmt::Display for RecordParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            RecordParseError::ParseTimeError(e) => write!(f, "Error parsing timestamp: {}", e),
-            RecordParseError::ParseError(s) => write!(f, "Error parsing record: {}", s),
-        }
-    }
-}
-
-impl From<chrono::format::ParseError> for RecordParseError {
-    fn from(error: chrono::format::ParseError) -> Self {
-        RecordParseError::ParseTimeError(error)
-    }
-}
-
-impl FromStr for Record {
-    type Err = RecordParseError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let substrings: Vec<_> = s
-            .split(|c| c == '[' || c == ']')
-            .filter(|s| !s.is_empty())
-            .map(|s| s.trim())
-            .collect();
-        if substrings.len() != 2 {
-            return Err(RecordParseError::ParseError(String::from(
-                "input does not match format",
-            )));
-        }
-        Ok(Self {
-            timestamp: NaiveDateTime::parse_from_str(substrings[0], "%Y-%m-%d %H:%M")?,
-            entry: substrings[1]
-                .parse()
-                .map_err(RecordParseError::ParseError)?,
-        })
-    }
 }
 
 #[cfg(test)]

@@ -344,7 +344,10 @@ dependencies = [
 name = "repose_record"
 version = "0.1.0"
 dependencies = [
+ "adhoc_derive 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "regex 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "util 0.1.0",
 ]
 
