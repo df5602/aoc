@@ -159,17 +159,15 @@ impl FromStr for Entry {
 }
 
 // Problems:
-// * This is just a work-around for the limitations of adhoc_derive (arguments need to correspond to regex capture group)
-// * Error handling not possible, because function_call(...)? is not a function all expression
 // * the trait `std::str::FromStr` is not implemented for `&str`
-fn parse_timestamp(s: String) -> NaiveDateTime {
-    NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M").unwrap()
+fn parse_timestamp(s: String, fmt: &str) -> Result<NaiveDateTime, chrono::format::ParseError> {
+    NaiveDateTime::parse_from_str(&s, fmt)
 }
 
 #[derive(Debug, FromStr)]
 #[adhoc(regex = r"^\[(?P<timestamp>.+)\] (?P<entry>.+)$")]
 struct Record {
-    #[adhoc(construct_with = "parse_timestamp(timestamp)")]
+    #[adhoc(construct_with = r#"parse_timestamp(timestamp, "%Y-%m-%d %H:%M")?"#)]
     timestamp: NaiveDateTime,
     entry: Entry,
 }
