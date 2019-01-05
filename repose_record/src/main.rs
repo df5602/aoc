@@ -158,16 +158,12 @@ impl FromStr for Entry {
     }
 }
 
-// Problems:
-// * the trait `std::str::FromStr` is not implemented for `&str`
-fn parse_timestamp(s: String, fmt: &str) -> Result<NaiveDateTime, chrono::format::ParseError> {
-    NaiveDateTime::parse_from_str(&s, fmt)
-}
-
 #[derive(Debug, FromStr)]
 #[adhoc(regex = r"^\[(?P<timestamp>.+)\] (?P<entry>.+)$")]
 struct Record {
-    #[adhoc(construct_with = r#"parse_timestamp(timestamp, "%Y-%m-%d %H:%M")?"#)]
+    #[adhoc(
+        construct_with = r#"NaiveDateTime::parse_from_str(timestamp: &str, "%Y-%m-%d %H:%M")?"#
+    )]
     timestamp: NaiveDateTime,
     entry: Entry,
 }

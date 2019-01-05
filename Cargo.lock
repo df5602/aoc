@@ -8,7 +8,7 @@ dependencies = [
 [[package]]
 name = "adhoc_derive"
 version = "0.1.0"
-source = "git+https://github.com/df5602/adhoc_derive#26b3857dd95604731b488d7275dd8032b04e4d9c"
+source = "git+https://github.com/df5602/adhoc_derive#5d8ff6f087736cb434f9c913fdbc74c23d4fc1b5"
 dependencies = [
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "proc-macro2 0.4.24 (registry+https://github.com/rust-lang/crates.io-index)",
