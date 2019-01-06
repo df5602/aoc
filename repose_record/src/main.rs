@@ -18,7 +18,7 @@ fn main() {
         }
     };
 
-    let mut input: Vec<Record> = match FileReader::new().read_from_file(input_file) {
+    let mut records: Vec<Record> = match FileReader::new().read_from_file(input_file) {
         Ok(input) => input,
         Err(e) => {
             println!("Error reading input: {}", e);
@@ -26,16 +26,13 @@ fn main() {
         }
     };
 
-    input.sort_unstable_by_key(|r| r.timestamp);
-    let input = input;
+    records.sort_unstable_by_key(|r| r.timestamp);
+    let records = records;
 
-    let (
-        guard_most_asleep,
-        asleep_time,
-        minute_asleep_most,
-        guard_most_asleep_2,
-        minute_asleep_most_2,
-    ) = part1_2(&input);
+    let sleep_distributions = create_distributions(&records);
+
+    let (guard_most_asleep, asleep_time) = find_guard_most_minutes_asleep(&sleep_distributions);
+    let minute_asleep_most = sleep_distributions[&guard_most_asleep].minute_most_asleep();
 
     println!(
         "Guard most asleep: {} => was asleep for {} minutes (most at minute {}) => Result: {}",
@@ -45,84 +42,112 @@ fn main() {
         guard_most_asleep * minute_asleep_most
     );
 
+    let (guard_most_asleep_at_same_minute, minute_asleep_most) =
+        find_guard_most_asleep_at_same_minute(&sleep_distributions);
+
     println!(
         "Guard most asleep at single minute: {} @ minute {} => Result: {}",
-        guard_most_asleep_2,
-        minute_asleep_most_2,
-        guard_most_asleep_2 * minute_asleep_most_2
+        guard_most_asleep_at_same_minute,
+        minute_asleep_most,
+        guard_most_asleep_at_same_minute * minute_asleep_most
     );
 }
 
-fn part1_2(input: &[Record]) -> (usize, usize, usize, usize, usize) {
-    let mut map_minutes: HashMap<usize, [usize; 60]> = HashMap::new();
-    let mut map_totals: HashMap<usize, usize> = HashMap::new();
+fn create_distributions(records: &[Record]) -> HashMap<usize, SleepDistribution> {
+    let mut distributions: HashMap<usize, SleepDistribution> = HashMap::new();
 
     let mut current_guard_id = 0;
     let mut fall_asleep_time = 0;
-    for record in input.iter() {
+    for record in records.iter() {
         match record.entry {
-            Entry::ShiftBegin(id) => {
-                if id == 0 {
-                    panic!("Guard ID is 0!");
-                } else {
-                    current_guard_id = id;
-                }
-            }
+            Entry::ShiftBegin(id) => current_guard_id = id,
             Entry::FallAsleep => fall_asleep_time = record.timestamp.time().minute(),
             Entry::WakeUp => {
                 let wake_up = record.timestamp.time().minute();
-                let minutes = map_minutes.entry(current_guard_id).or_insert([0; 60]);
-                for min in fall_asleep_time..wake_up {
-                    (*minutes)[min as usize] += 1;
-                }
-                *map_totals.entry(current_guard_id).or_insert(0) +=
-                    (wake_up - fall_asleep_time) as usize;
+                distributions
+                    .entry(current_guard_id)
+                    .or_insert_with(SleepDistribution::new)
+                    .increment_asleep(fall_asleep_time as usize, wake_up as usize);
             }
         }
     }
 
-    let mut guard_most_asleep = 0;
-    let mut asleep_time = 0;
-    for (id, total) in map_totals.iter() {
-        if *total > asleep_time {
-            guard_most_asleep = *id;
-            asleep_time = *total;
+    distributions
+}
+
+fn find_guard_most_minutes_asleep(
+    sleep_distributions: &HashMap<usize, SleepDistribution>,
+) -> (usize, u32) {
+    let mut guard_most_asleep = usize::min_value();
+    let mut asleep_time = u32::min_value();
+    for (&id, sum) in sleep_distributions.iter().map(|(k, v)| (k, v.sum())) {
+        if sum > asleep_time {
+            guard_most_asleep = id;
+            asleep_time = sum;
+        }
+    }
+    (guard_most_asleep, asleep_time)
+}
+
+fn find_guard_most_asleep_at_same_minute(
+    sleep_distributions: &HashMap<usize, SleepDistribution>,
+) -> (usize, usize) {
+    let mut guard_most_asleep = usize::min_value();
+    let mut minute_asleep_most = usize::min_value();
+    let mut maximum_minutes = u32::min_value();
+    for (&id, (minute_most_asleep, max_minute)) in sleep_distributions.iter().map(|(k, v)| {
+        let minute_most_asleep = v.minute_most_asleep();
+        let max_minute = v.at(minute_most_asleep);
+        (k, (minute_most_asleep, max_minute))
+    }) {
+        if max_minute > maximum_minutes {
+            maximum_minutes = max_minute;
+            minute_asleep_most = minute_most_asleep;
+            guard_most_asleep = id;
         }
     }
 
-    let mut minute_asleep_most = 0;
-    {
-        let minutes = map_minutes.entry(guard_most_asleep).or_insert([0; 60]);
+    (guard_most_asleep, minute_asleep_most)
+}
 
-        let mut max_minute = 0;
-        for (min, tot) in minutes.iter().enumerate() {
-            if *tot > max_minute {
-                max_minute = *tot;
-                minute_asleep_most = min;
+struct SleepDistribution {
+    minutes: [u32; 60],
+}
+
+impl SleepDistribution {
+    fn new() -> Self {
+        Self { minutes: [0; 60] }
+    }
+
+    fn at(&self, minute: usize) -> u32 {
+        assert!(minute < 60);
+        self.minutes[minute]
+    }
+
+    fn increment_asleep(&mut self, from: usize, until: usize) {
+        assert!(from <= until);
+        assert!(until < 60);
+
+        for min in from..until {
+            self.minutes[min] += 1;
+        }
+    }
+
+    fn sum(&self) -> u32 {
+        self.minutes.iter().sum()
+    }
+
+    fn minute_most_asleep(&self) -> usize {
+        let mut minute_most_asleep = usize::min_value();
+        let mut minutes_asleep = u32::min_value();
+        for (minute, &amount) in self.minutes.iter().enumerate() {
+            if amount > minutes_asleep {
+                minute_most_asleep = minute;
+                minutes_asleep = amount;
             }
         }
+        minute_most_asleep
     }
-
-    let mut guard_most_asleep_2 = 0;
-    let mut minute_asleep_most_2 = 0;
-    let mut max_minute = 0;
-    for (id, minutes) in map_minutes.iter() {
-        for (min, tot) in minutes.iter().enumerate() {
-            if *tot > max_minute {
-                max_minute = *tot;
-                minute_asleep_most_2 = min;
-                guard_most_asleep_2 = *id;
-            }
-        }
-    }
-
-    (
-        guard_most_asleep,
-        asleep_time,
-        minute_asleep_most,
-        guard_most_asleep_2,
-        minute_asleep_most_2,
-    )
 }
 
 #[derive(Debug)]
@@ -174,31 +199,21 @@ mod tests {
 
     #[test]
     fn test_part1() {
-        let inputs = vec![
-            "[1518-11-01 00:00] Guard #10 begins shift",
-            "[1518-11-01 00:05] falls asleep", // [5,25)
-            "[1518-11-01 00:25] wakes up",
-            "[1518-11-01 00:30] falls asleep", // [30, 55)
-            "[1518-11-01 00:55] wakes up",
-            "[1518-11-01 23:58] Guard #99 begins shift",
-            "[1518-11-02 00:40] falls asleep",
-            "[1518-11-02 00:50] wakes up",
-            "[1518-11-03 00:05] Guard #10 begins shift",
-            "[1518-11-03 00:24] falls asleep", // [24, 29)
-            "[1518-11-03 00:29] wakes up",
-            "[1518-11-04 00:02] Guard #99 begins shift",
-            "[1518-11-04 00:36] falls asleep",
-            "[1518-11-04 00:46] wakes up",
-            "[1518-11-05 00:03] Guard #99 begins shift",
-            "[1518-11-05 00:45] falls asleep",
-            "[1518-11-05 00:55] wakes up",
-        ];
+        let mut records: Vec<Record> = FileReader::new().read_from_file("input.txt").unwrap();
+        records.sort_unstable_by_key(|r| r.timestamp);
+        let sleep_distributions = create_distributions(&records);
+        let (guard_most_asleep, _) = find_guard_most_minutes_asleep(&sleep_distributions);
+        let minute_asleep_most = sleep_distributions[&guard_most_asleep].minute_most_asleep();
+        assert_eq!(36898, guard_most_asleep * minute_asleep_most);
+    }
 
-        let mut input: Vec<Record> = Vec::new();
-        for line in inputs {
-            input.push(line.parse().unwrap());
-        }
-
-        assert_eq!((10, 50, 24, 99, 45), part1_2(&input));
+    #[test]
+    fn test_part2() {
+        let mut records: Vec<Record> = FileReader::new().read_from_file("input.txt").unwrap();
+        records.sort_unstable_by_key(|r| r.timestamp);
+        let sleep_distributions = create_distributions(&records);
+        let (guard_most_asleep_at_same_minute, minute_asleep_most) =
+            find_guard_most_asleep_at_same_minute(&sleep_distributions);
+        assert_eq!(80711, guard_most_asleep_at_same_minute * minute_asleep_most);
     }
 }
