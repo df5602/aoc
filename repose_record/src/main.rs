@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::env;
-use std::str::FromStr;
 
 use chrono::naive::NaiveDateTime;
 use chrono::Timelike;
@@ -150,37 +149,14 @@ impl SleepDistribution {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, FromStr)]
 enum Entry {
+    #[adhoc(regex = r"^Guard #(?P<0>\d+) begins shift$")]
     ShiftBegin(usize),
+    #[adhoc(regex = r"^falls asleep$")]
     FallAsleep,
+    #[adhoc(regex = r"^wakes up$")]
     WakeUp,
-}
-
-impl FromStr for Entry {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.starts_with("Guard") {
-            match s
-                .split_whitespace()
-                .filter(|s| !s.is_empty())
-                .map(|s| s.trim())
-                .filter(|s| s.starts_with('#'))
-                .map(|s| s[1..].parse().map_err(|e| format!("{}", e)))
-                .nth(0)
-            {
-                Some(id) => Ok(Entry::ShiftBegin(id?)),
-                None => Err("could not find guard id".to_string()),
-            }
-        } else if s.contains("asleep") {
-            Ok(Entry::FallAsleep)
-        } else if s.contains("wakes") {
-            Ok(Entry::WakeUp)
-        } else {
-            Err("invalid entry".to_string())
-        }
-    }
 }
 
 #[derive(Debug, FromStr)]
