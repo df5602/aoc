@@ -417,9 +417,9 @@ impl FromStr for ScanLine {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.starts_with('x') {
             lazy_static! {
-                static ref regex: Regex = Regex::new(r"^x=(\d+), y=(\d+)\.\.(\d+)$").unwrap();
+                static ref REGEX: Regex = Regex::new(r"^x=(\d+), y=(\d+)\.\.(\d+)$").unwrap();
             }
-            let captures = match regex.captures(s) {
+            let captures = match REGEX.captures(s) {
                 Some(captures) => captures,
                 None => {
                     return Err("input does not match expected format".to_string());
@@ -447,9 +447,9 @@ impl FromStr for ScanLine {
             }))
         } else if s.starts_with('y') {
             lazy_static! {
-                static ref regex: Regex = Regex::new(r"^y=(\d+), x=(\d+)\.\.(\d+)$").unwrap();
+                static ref REGEX: Regex = Regex::new(r"^y=(\d+), x=(\d+)\.\.(\d+)$").unwrap();
             }
-            let captures = match regex.captures(s) {
+            let captures = match REGEX.captures(s) {
                 Some(captures) => captures,
                 None => {
                     return Err("input does not match expected format".to_string());

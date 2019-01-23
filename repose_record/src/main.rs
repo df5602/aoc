@@ -77,36 +77,26 @@ fn create_distributions(records: &[Record]) -> HashMap<usize, SleepDistribution>
 fn find_guard_most_minutes_asleep(
     sleep_distributions: &HashMap<usize, SleepDistribution>,
 ) -> (usize, u32) {
-    let mut guard_most_asleep = usize::min_value();
-    let mut asleep_time = u32::min_value();
-    for (&id, sum) in sleep_distributions.iter().map(|(k, v)| (k, v.sum())) {
-        if sum > asleep_time {
-            guard_most_asleep = id;
-            asleep_time = sum;
-        }
-    }
-    (guard_most_asleep, asleep_time)
+    sleep_distributions
+        .iter()
+        .map(|(&guard, v)| (guard, v.sum()))
+        .max_by_key(|(_, v)| *v)
+        .unwrap_or_default()
 }
 
 fn find_guard_most_asleep_at_same_minute(
     sleep_distributions: &HashMap<usize, SleepDistribution>,
 ) -> (usize, usize) {
-    let mut guard_most_asleep = usize::min_value();
-    let mut minute_asleep_most = usize::min_value();
-    let mut maximum_minutes = u32::min_value();
-    for (&id, (minute_most_asleep, max_minute)) in sleep_distributions.iter().map(|(k, v)| {
-        let minute_most_asleep = v.minute_most_asleep();
-        let max_minute = v.at(minute_most_asleep);
-        (k, (minute_most_asleep, max_minute))
-    }) {
-        if max_minute > maximum_minutes {
-            maximum_minutes = max_minute;
-            minute_asleep_most = minute_most_asleep;
-            guard_most_asleep = id;
-        }
-    }
-
-    (guard_most_asleep, minute_asleep_most)
+    sleep_distributions
+        .iter()
+        .map(|(&guard, v)| {
+            let minute_most_asleep = v.minute_most_asleep();
+            let max_minute = v.at(minute_most_asleep);
+            (guard, (minute_most_asleep, max_minute))
+        })
+        .max_by_key(|(_, (_, max_minute))| *max_minute)
+        .map(|(guard, (minute_most_asleep, _))| (guard, minute_most_asleep))
+        .unwrap_or_default()
 }
 
 struct SleepDistribution {
@@ -137,15 +127,12 @@ impl SleepDistribution {
     }
 
     fn minute_most_asleep(&self) -> usize {
-        let mut minute_most_asleep = usize::min_value();
-        let mut minutes_asleep = u32::min_value();
-        for (minute, &amount) in self.minutes.iter().enumerate() {
-            if amount > minutes_asleep {
-                minute_most_asleep = minute;
-                minutes_asleep = amount;
-            }
-        }
-        minute_most_asleep
+        self.minutes
+            .iter()
+            .enumerate()
+            .max_by_key(|(_, amount)| *amount)
+            .map(|(minute, _)| minute)
+            .unwrap_or_default()
     }
 }
 

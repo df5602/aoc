@@ -186,10 +186,10 @@ impl FromStr for Nanobot {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         lazy_static! {
-            static ref regex: Regex =
+            static ref REGEX: Regex =
                 Regex::new(r"^pos=<(-?\d+),(-?\d+),(-?\d+)>, r=(\d+)$").unwrap();
         }
-        let captures = match regex.captures(s) {
+        let captures = match REGEX.captures(s) {
             Some(captures) => captures,
             None => {
                 return Err("input does not match expected format".to_string());
