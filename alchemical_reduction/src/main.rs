@@ -28,21 +28,19 @@ fn main() {
 
     println!("Remaining units: {}", react(&input, None));
 
-    let mut shortest_polymer = usize::max_value();
-    let mut problematic_unit = 0;
-
-    for c in b'a'..=b'z' {
-        let length = react(&input, Some(c));
-        if length < shortest_polymer {
-            shortest_polymer = length;
-            problematic_unit = c;
-        }
-    }
+    let (problematic_unit, shortest_polymer) = find_shortest_polymer(&input);
 
     println!(
         "Shortest polymer: Remove {} => Resulting length: {}",
         problematic_unit as char, shortest_polymer
     );
+}
+
+fn find_shortest_polymer(input: &str) -> (u8, usize) {
+    (b'a'..=b'z')
+        .map(|c| (c, react(&input, Some(c))))
+        .min_by_key(|(_, length)| *length)
+        .unwrap_or_default()
 }
 
 fn react(input: &str, ignore: Option<u8>) -> usize {
@@ -58,8 +56,7 @@ fn react(input: &str, ignore: Option<u8>) -> usize {
             continue;
         }
 
-        // Cloned shouldn't hurt performance wise, since T is u8 which is copy
-        match stack.back().cloned() {
+        match stack.back() {
             Some(last) => {
                 if last ^ c == 32 {
                     stack.pop_back();
@@ -93,5 +90,21 @@ mod tests {
         assert_eq!(8, react("dabAcCaCBAcCcaDA", Some(b'b')));
         assert_eq!(4, react("dabAcCaCBAcCcaDA", Some(b'c')));
         assert_eq!(6, react("dabAcCaCBAcCcaDA", Some(b'd')));
+    }
+
+    #[test]
+    fn test_part1() {
+        let input: String = FileReader::new().read_from_file("input.txt").unwrap();
+        assert!(input.is_ascii());
+        assert_eq!(11546, react(&input, None));
+    }
+
+    #[test]
+    fn test_part2() {
+        let input: String = FileReader::new().read_from_file("input.txt").unwrap();
+        assert!(input.is_ascii());
+
+        let (_, shortest_polymer) = find_shortest_polymer(&input);
+        assert_eq!(5124, shortest_polymer);
     }
 }
