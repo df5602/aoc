@@ -1,7 +1,8 @@
 use std::cmp::{max, min};
 use std::collections::HashMap;
 use std::env;
-use std::str::FromStr;
+
+use adhoc_derive::FromStr;
 
 use util::input::{FileReader, FromFile};
 
@@ -22,22 +23,20 @@ fn main() {
         }
     };
 
-    let (largest_area, point_with_largest_area) = find_largest_area(&input);
+    let (max_width, max_height) = calculate_dimensions(&input);
+
+    let (largest_area, point_with_largest_area) = find_largest_area(&input, max_width, max_height);
 
     println!(
         "Largest area: {} (Point: ({},{}))",
-        largest_area, point_with_largest_area.0, point_with_largest_area.1
+        largest_area, point_with_largest_area.x, point_with_largest_area.y
     );
 
-    let size_of_region = find_region(&input, 10000);
+    let size_of_region = find_region(&input, 10000, max_width, max_height);
     println!("Size  of region: {}", size_of_region);
 }
 
-fn find_largest_area(points: &[Point]) -> (usize, (usize, usize)) {
-    let (max_width, max_height) = points
-        .iter()
-        .fold((0, 0), |m, p| (max(m.0, p.x), max(m.1, p.y)));
-
+fn find_largest_area(points: &[Point], max_width: usize, max_height: usize) -> (usize, Point) {
     let mut map = HashMap::new();
     for x in 0..=max_width {
         for y in 0..=max_height {
@@ -47,14 +46,14 @@ fn find_largest_area(points: &[Point]) -> (usize, (usize, usize)) {
             for (dist, q) in points.iter().map(|q| (p.manhattan_distance_to(&q), q)) {
                 if dist < shortest_dist {
                     shortest_dist = dist;
-                    closest_point = Some((*q).clone());
+                    closest_point = Some(*q);
                 } else if dist == shortest_dist {
                     closest_point = None;
                 }
             }
 
             if let Some(q) = closest_point {
-                let counter = map.entry((q.x, q.y)).or_insert(0usize);
+                let counter = map.entry(q).or_insert(0usize);
 
                 if p.x == 0 || p.x == max_width || p.y == 0 || p.y == max_height {
                     *counter = usize::max_value();
@@ -65,31 +64,24 @@ fn find_largest_area(points: &[Point]) -> (usize, (usize, usize)) {
         }
     }
 
-    let mut point_with_largest_area = (0, 0);
-    let mut largest_area = 0;
-    for (&k, &v) in map.iter() {
-        if v < usize::max_value() && v > largest_area {
-            point_with_largest_area = k;
-            largest_area = v;
-        }
-    }
-
-    (largest_area, point_with_largest_area)
+    map.iter()
+        .filter(|(_, &area)| area < usize::max_value())
+        .max_by_key(|(_, &area)| area)
+        .map(|(&point, &area)| (area, point))
+        .unwrap_or_else(|| (0, Point::new(0, 0)))
 }
 
-fn find_region(points: &[Point], distance_threshold: usize) -> usize {
-    let (max_width, max_height) = points
-        .iter()
-        .fold((0, 0), |m, p| (max(m.0, p.x), max(m.1, p.y)));
-
+fn find_region(
+    points: &[Point],
+    distance_threshold: usize,
+    max_width: usize,
+    max_height: usize,
+) -> usize {
     let mut size_of_region = 0;
     for x in 0..=max_width {
         for y in 0..=max_height {
             let p = Point::new(x, y);
-            let mut sum_of_distances = 0;
-            for dist in points.iter().map(|q| p.manhattan_distance_to(&q)) {
-                sum_of_distances += dist;
-            }
+            let sum_of_distances: usize = points.iter().map(|q| p.manhattan_distance_to(&q)).sum();
 
             if sum_of_distances < distance_threshold {
                 size_of_region += 1;
@@ -100,31 +92,17 @@ fn find_region(points: &[Point], distance_threshold: usize) -> usize {
     size_of_region
 }
 
-#[derive(Debug, Clone)]
+fn calculate_dimensions(points: &[Point]) -> (usize, usize) {
+    points
+        .iter()
+        .fold((0, 0), |m, p| (max(m.0, p.x), max(m.1, p.y)))
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FromStr)]
+#[adhoc(regex = r"^(?P<x>\d+), (?P<y>\d+)$")]
 struct Point {
     x: usize,
     y: usize,
-}
-
-impl FromStr for Point {
-    type Err = std::num::ParseIntError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let substrings: Vec<_> = s
-            .split(',')
-            .filter(|s| !s.is_empty())
-            .map(|s| s.trim())
-            .collect();
-
-        if substrings.len() != 2 {
-            panic!("input does not match format");
-        }
-
-        Ok(Self {
-            x: substrings[0].parse()?,
-            y: substrings[1].parse()?,
-        })
-    }
 }
 
 impl Point {
@@ -159,9 +137,11 @@ mod tests {
             Point::new(8, 9),
         ];
 
-        let (largest_area, point_with_largest_area) = find_largest_area(&points);
+        let (max_width, max_height) = calculate_dimensions(&points);
+        let (largest_area, point_with_largest_area) =
+            find_largest_area(&points, max_width, max_height);
         assert_eq!(17, largest_area);
-        assert_eq!((5, 5), point_with_largest_area);
+        assert_eq!(Point::new(5, 5), point_with_largest_area);
     }
 
     #[test]
@@ -174,6 +154,23 @@ mod tests {
             Point::new(5, 5),
             Point::new(8, 9),
         ];
-        assert_eq!(16, find_region(&points, 32));
+        let (max_width, max_height) = calculate_dimensions(&points);
+        assert_eq!(16, find_region(&points, 32, max_width, max_height));
+    }
+
+    #[test]
+    fn test_part1() {
+        let input: Vec<Point> = FileReader::new().read_from_file("input.txt").unwrap();
+        let (max_width, max_height) = calculate_dimensions(&input);
+        let (largest_area, _) = find_largest_area(&input, max_width, max_height);
+        assert_eq!(3260, largest_area);
+    }
+
+    #[test]
+    fn test_part2() {
+        let input: Vec<Point> = FileReader::new().read_from_file("input.txt").unwrap();
+        let (max_width, max_height) = calculate_dimensions(&input);
+        let size_of_region = find_region(&input, 10000, max_width, max_height);
+        assert_eq!(42535, size_of_region);
     }
 }
